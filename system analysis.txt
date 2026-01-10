@@ -1,0 +1,5 @@
+system analysis 
+system design :-
+	data flow 
+	uml diagram
+	er diagram
