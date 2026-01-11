@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 
-function App() {
+export default function App() {
   const [items, setItems] = useState([]);
   const [form, setForm] = useState({
     title: "",
@@ -16,7 +16,7 @@ function App() {
       .then(res => setItems(res.data));
   }, []);
 
-  const submit = async () => {
+  const submitItem = async () => {
     await axios.post("http://localhost:5000/api/items", form);
     window.location.reload();
   };
@@ -25,14 +25,16 @@ function App() {
     <div style={{ padding: 20 }}>
       <h1>Lost & Found</h1>
 
-      <input placeholder="Title" onChange={e => setForm({...form, title: e.target.value})} />
-      <input placeholder="Location" onChange={e => setForm({...form, location: e.target.value})} />
-      <textarea placeholder="Description" onChange={e => setForm({...form, description: e.target.value})}></textarea>
-      <select onChange={e => setForm({...form, type: e.target.value})}>
+      <input placeholder="Title" onChange={e => setForm({ ...form, title: e.target.value })} />
+      <input placeholder="Location" onChange={e => setForm({ ...form, location: e.target.value })} />
+      <textarea placeholder="Description" onChange={e => setForm({ ...form, description: e.target.value })} />
+      
+      <select onChange={e => setForm({ ...form, type: e.target.value })}>
         <option value="lost">Lost</option>
         <option value="found">Found</option>
       </select>
-      <button onClick={submit}>Submit</button>
+
+      <button onClick={submitItem}>Submit</button>
 
       <hr />
 
@@ -46,5 +48,3 @@ function App() {
     </div>
   );
 }
-
-export default App;
