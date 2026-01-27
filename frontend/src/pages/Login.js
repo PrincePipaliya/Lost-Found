@@ -1,94 +1,92 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 
-import { Link } from "react-router-dom";
-
 export default function Login() {
+  const navigate = useNavigate();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const submit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
     setLoading(true);
 
     try {
-      const res = await api.post("/auth/login", { email, password });
+      const res = await api.post("/auth/login", {
+        email: email.trim().toLowerCase(),
+        password: password.trim()
+      });
+
+      // ✅ SAFE STORAGE
       localStorage.setItem("token", res.data.token);
-      window.location.href = "/";
-    } catch {
-      alert("Invalid credentials");
+      localStorage.setItem("role", res.data.user.role);
+      localStorage.setItem("name", res.data.user.name);
+
+      navigate("/dashboard", { replace: true });
+    } catch (err) {
+      setError(err.response?.data?.message || "Login failed");
+    } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 to-indigo-200">
-      <div className="w-full max-w-md bg-white rounded-xl shadow-lg p-8 animate-fadeInUp">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 animate-fadeInUp">
+      <form
+        onSubmit={handleSubmit}
+        className="bg-white p-8 rounded-xl shadow-md w-full max-w-md"
+      >
+        <h1 className="text-2xl font-extrabold mb-6 text-center">
+          Login to{" "}
+          <span className="text-blue-600">we</span>
+          <span className="text-gray-900">FOUND</span>
+          <span className="text-green-600">it</span>
+        </h1>
 
-        <h2 className="text-2xl font-bold text-center mb-2">
-  Welcome to{" "}
-  <span className="text-blue-600">we</span>
-  <span className="text-gray-900">FOUND</span>
-  <span className="text-green-600">it</span>
-</h2>
-<p className="text-center text-gray-500 mb-6">
-  Reuniting people with what they lost
-</p>
-
-
-        <form onSubmit={submit} className="space-y-5">
-
-          <div className="relative">
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="peer w-full border rounded px-3 pt-5 pb-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
-            <label className="absolute left-3 top-2 text-gray-500 text-sm transition-all
-              peer-placeholder-shown:top-4 peer-placeholder-shown:text-base
-              peer-focus:top-2 peer-focus:text-sm">
-              Email
-            </label>
+        {error && (
+          <div className="mb-4 text-red-600 text-sm text-center">
+            {error}
           </div>
+        )}
 
-          <div className="relative">
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="peer w-full border rounded px-3 pt-5 pb-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
-            <label className="absolute left-3 top-2 text-gray-500 text-sm transition-all
-              peer-placeholder-shown:top-4 peer-placeholder-shown:text-base
-              peer-focus:top-2 peer-focus:text-sm">
-              Password
-            </label>
-          </div>
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-1">Email</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="w-full border px-3 py-2 rounded
+              focus:outline-none focus:ring focus:ring-blue-300"
+          />
+        </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 rounded font-semibold
-              hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50"
-          >
-            {loading ? "Logging in..." : "Login"}
-          </button>
-        </form>
+        <div className="mb-6">
+          <label className="block text-sm font-medium mb-1">Password</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="w-full border px-3 py-2 rounded
+              focus:outline-none focus:ring focus:ring-blue-300"
+          />
+        </div>
 
-        <p className="text-center text-sm text-gray-600 mt-6">
-          Don’t have an account?{" "}
-          <Link
-            to="/register"
-            className="text-blue-600 font-semibold hover:underline transition"
-          >
-            Register
-          </Link>
-        </p>
-      </div>
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-2 rounded bg-blue-600 text-white
+            hover:bg-blue-700 active:scale-95 transition
+            disabled:opacity-60"
+        >
+          {loading ? "Logging in..." : "Login"}
+        </button>
+      </form>
     </div>
   );
 }

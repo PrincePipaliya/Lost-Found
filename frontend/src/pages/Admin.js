@@ -1,15 +1,35 @@
 import { useEffect, useState } from "react";
 import api from "../services/api";
+import { useNavigate } from "react-router-dom";
 
 export default function Admin() {
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // 🔐 Role-based guard (frontend UX)
+  useEffect(() => {
+    const role = localStorage.getItem("role");
+    if (role !== "admin") {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [navigate]);
+
   const loadItems = async () => {
-    setLoading(true);
-    const res = await api.get("/items");
-    setItems(res.data);
-    setLoading(false);
+    try {
+      setLoading(true);
+      const res = await api.get("/items");
+      setItems(res.data);
+    } catch (err) {
+      // Token expired or invalid
+      if (err.response?.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("role");
+        navigate("/login", { replace: true });
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -17,8 +37,12 @@ export default function Admin() {
   }, []);
 
   const approveItem = async (id) => {
-    await api.put(`/items/${id}/approve`);
-    loadItems();
+    try {
+      await api.put(`/items/${id}/approve`);
+      loadItems();
+    } catch (err) {
+      alert("Failed to approve item");
+    }
   };
 
   const deleteItem = async (id) => {
@@ -27,8 +51,12 @@ export default function Admin() {
     );
     if (!confirm) return;
 
-    await api.delete(`/items/${id}`);
-    loadItems();
+    try {
+      await api.delete(`/items/${id}`);
+      loadItems();
+    } catch (err) {
+      alert("Failed to delete item");
+    }
   };
 
   const pendingCount = items.filter(i => i.status === "pending").length;

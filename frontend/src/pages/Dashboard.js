@@ -10,12 +10,18 @@ export default function Dashboard() {
     api
       .get("/items" + (filter ? `?type=${filter}` : ""))
       .then(res => setItems(res.data))
-      .catch(() => alert("Unauthorized"));
   };
 
-  useEffect(() => {
-    loadItems();
-  }, [filter]);
+ useEffect(() => {
+  api.get("/items")
+    .then(res => setItems(res.data))
+    .catch(err => {
+      if (err.response?.status === 401) {
+        localStorage.removeItem("token");
+        window.location.href = "/login";
+      }
+    });
+}, []);
 
   const logout = () => {
     localStorage.removeItem("token");

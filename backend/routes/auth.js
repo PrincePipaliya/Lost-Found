@@ -14,14 +14,14 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    const existing = await User.findOne({ email });
-    if (existing) {
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
       return res.status(400).json({ message: "User already exists" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    await User.create({
+    const user = await User.create({
       name,
       email,
       password: hashedPassword,
@@ -58,11 +58,20 @@ router.post("/login", async (req, res) => {
       { expiresIn: "1d" }
     );
 
-    res.json({ token });
+    // ✅ SEND USER DATA
+    res.json({
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        role: user.role
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Login failed" });
   }
 });
+
 
 module.exports = router;
