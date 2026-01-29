@@ -1,5 +1,5 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -14,7 +14,6 @@ export default function Navbar() {
 
   const [open, setOpen] = useState(false);
 
-  // ✅ SAFE PATHNAME (prevents crashes)
   const pathname = location?.pathname || "";
 
   const logout = () => {
@@ -40,10 +39,10 @@ export default function Navbar() {
     <nav className="bg-white shadow-md sticky top-0 z-50 animate-slideDown">
       <div className="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
 
-        {/* LOGO */}
+        {/* LOGO (ALWAYS VISIBLE) */}
         <Link
           to={isLoggedIn ? "/dashboard" : "/login"}
-          className="text-2xl font-extrabold tracking-wide hover:scale-105 transition-transform"
+          className="text-2xl font-extrabold tracking-wide"
         >
           <span className="text-blue-600">we</span>
           <span className="text-gray-900">FOUND</span>
@@ -53,10 +52,12 @@ export default function Navbar() {
         {/* DESKTOP MENU */}
         <div className="hidden md:flex items-center gap-4">
 
+          {/* PUBLIC */}
           <DesktopLink to="/about" active={pathname === "/about"}>About</DesktopLink>
           <DesktopLink to="/how-it-works" active={pathname === "/how-it-works"}>How It Works</DesktopLink>
           <DesktopLink to="/contact" active={pathname === "/contact"}>Contact</DesktopLink>
 
+          {/* LOGGED OUT */}
           {!isLoggedIn && (
             <>
               <DesktopLink to="/login" active={pathname === "/login"}>Login</DesktopLink>
@@ -64,16 +65,14 @@ export default function Navbar() {
             </>
           )}
 
+          {/* LOGGED IN */}
           {isLoggedIn && (
             <>
               <DesktopLink to="/dashboard" active={pathname === "/dashboard"}>Dashboard</DesktopLink>
               <DesktopLink to="/my-posts" active={pathname === "/my-posts"}>My Posts</DesktopLink>
 
               {isAdmin && (
-                <>
-                  <DesktopLink to="/admin" active={pathname === "/admin"}>Admin</DesktopLink>
-                  <DesktopLink to="/admin/users" active={pathname === "/admin/users"}>Users</DesktopLink>
-                </>
+                <DesktopLink to="/admin" active={pathname === "/admin"}>Admin</DesktopLink>
               )}
 
               <div className="flex items-center gap-2 ml-3">
@@ -88,7 +87,7 @@ export default function Navbar() {
               <button
                 onClick={logout}
                 className="ml-3 px-4 py-2 rounded bg-red-500 text-white
-                  hover:bg-red-600 hover:shadow-lg active:scale-95 transition"
+                  hover:bg-red-600 transition"
               >
                 Logout
               </button>
@@ -128,16 +127,11 @@ export default function Navbar() {
             <>
               <NavItem to="/dashboard">Dashboard</NavItem>
               <NavItem to="/my-posts">My Posts</NavItem>
-              {isAdmin && (
-                <>
-                  <NavItem to="/admin">Admin</NavItem>
-                  <NavItem to="/admin/users">Users</NavItem>
-                </>
-              )}
+              {isAdmin && <NavItem to="/admin">Admin</NavItem>}
+
               <button
                 onClick={logout}
-                className="block w-full text-left px-4 py-2 text-lg
-                  text-red-600 hover:bg-red-50 transition"
+                className="block w-full text-left px-4 py-2 text-lg text-red-600"
               >
                 Logout
               </button>

@@ -23,29 +23,8 @@ router.post("/", auth, upload.single("image"), async (req, res) => {
 
     res.json(item);
   } catch (err) {
-    console.error(err);
+    console.error("CREATE ITEM ERROR:", err);
     res.status(500).json({ message: "Failed to create item" });
-  }
-});
-
-/* =========================
-   GET ITEMS
-   - Admin: all
-   - User: approved only
-========================= */
-router.get("/", auth, async (req, res) => {
-  try {
-    if (req.user.role === "admin") {
-      const allItems = await Item.find().sort({ date: -1 });
-      return res.json(allItems);
-    }
-
-    const approvedItems = await Item.find({ status: "approved" })
-      .sort({ date: -1 });
-
-    res.json(approvedItems);
-  } catch (err) {
-    res.status(500).json({ message: "Failed to load items" });
   }
 });
 
@@ -56,19 +35,20 @@ router.get("/mine", auth, async (req, res) => {
   try {
     const myItems = await Item.find({
       userId: new mongoose.Types.ObjectId(req.user.id)
-    }).sort({ date: -1 });
+    }).sort({ createdAt: -1 });
 
     res.json(myItems);
   } catch (err) {
-    console.error(err);
+    console.error("MY POSTS ERROR:", err);
     res.status(500).json({ message: "Failed to load your posts" });
   }
 });
 
 /* =========================
    PUBLIC ITEM DETAIL
+   (Approved items only)
 ========================= */
-router.get("/public/:id", async (req, res) => {
+router.get("/:id", async (req, res) => {
   try {
     const item = await Item.findById(req.params.id);
 
@@ -77,8 +57,29 @@ router.get("/public/:id", async (req, res) => {
     }
 
     res.json(item);
-  } catch {
-    res.status(404).json({ message: "Item not found" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to load item" });
+  }
+});
+
+/* =========================
+   GET ITEMS
+   - Admin: all items
+   - User: approved only
+========================= */
+router.get("/", auth, async (req, res) => {
+  try {
+    if (req.user.role === "admin") {
+      const allItems = await Item.find().sort({ createdAt: -1 });
+      return res.json(allItems);
+    }
+
+    const approvedItems = await Item.find({ status: "approved" })
+      .sort({ createdAt: -1 });
+
+    res.json(approvedItems);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to load items" });
   }
 });
 
@@ -97,13 +98,23 @@ router.put("/:id/approve", auth, async (req, res) => {
 /* =========================
    DELETE ITEM (ADMIN)
 ========================= */
-router.delete("/:id/admin", auth, async (req, res) => {
-  if (req.user.role !== "admin") {
-    return res.status(403).json({ message: "Admin access required" });
-  }
+router.delete("/:id", auth, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
 
-  await Item.findByIdAndDelete(req.params.id);
-  res.json({ message: "Item permanently deleted" });
+    const item = await Item.findById(req.params.id);
+    if (!item) {
+      return res.status(404).json({ message: "Item not found" });
+    }
+
+    await item.deleteOne();
+    res.json({ message: "Item deleted successfully" });
+  } catch (err) {
+    console.error("ADMIN DELETE ERROR:", err);
+    res.status(500).json({ message: "Failed to delete item" });
+  }
 });
 
 /* =========================
@@ -113,8 +124,9 @@ router.put("/:id/own", auth, async (req, res) => {
   const item = await Item.findById(req.params.id);
 
   if (!item) return res.status(404).json({ message: "Not found" });
-  if (item.userId.toString() !== req.user.id)
+  if (item.userId.toString() !== req.user.id) {
     return res.status(403).json({ message: "Forbidden" });
+  }
 
   Object.assign(item, req.body);
   await item.save();
@@ -129,8 +141,9 @@ router.delete("/:id/own", auth, async (req, res) => {
   const item = await Item.findById(req.params.id);
 
   if (!item) return res.status(404).json({ message: "Not found" });
-  if (item.userId.toString() !== req.user.id)
+  if (item.userId.toString() !== req.user.id) {
     return res.status(403).json({ message: "Forbidden" });
+  }
 
   await item.deleteOne();
   res.json({ message: "Deleted" });

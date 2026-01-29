@@ -4,20 +4,20 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Admin from "./pages/Admin";
-import UserManagement from "./pages/UserManagement";
+import MyPosts from "./pages/MyPosts";
 import About from "./pages/About";
 import HowItWorks from "./pages/HowItWorks";
 import Contact from "./pages/Contact";
-import MyPosts from "./pages/MyPosts";
-import Navbar from "./components/Navbar";
+import ItemDetail from "./pages/ItemDetail";
+import Layout from "./Layout";
 
-/* ---------- AUTH GUARDS ---------- */
-
+/* Logged-in users */
 const PrivateRoute = ({ children }) => {
   const token = localStorage.getItem("token");
   return token ? children : <Navigate to="/login" replace />;
 };
 
+/* Admin-only */
 const AdminRoute = ({ children }) => {
   const token = localStorage.getItem("token");
   const role = localStorage.getItem("role");
@@ -28,71 +28,54 @@ const AdminRoute = ({ children }) => {
   return children;
 };
 
-const HomeRedirect = () => {
-  const token = localStorage.getItem("token");
-  return token ? (
-    <Navigate to="/dashboard" replace />
-  ) : (
-    <Navigate to="/login" replace />
-  );
-};
-
 export default function App() {
   return (
     <BrowserRouter>
-      {/* ✅ ALWAYS SHOW NAVBAR */}
-      <Navbar />
-
       <Routes>
-        <Route path="/" element={<HomeRedirect />} />
+        {/* Layout ALWAYS renders Navbar */}
+        <Route element={<Layout />}>
 
-        {/* Public */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/how-it-works" element={<HowItWorks />} />
-        <Route path="/contact" element={<Contact />} />
+          {/* Public */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/how-it-works" element={<HowItWorks />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/items/:id" element={<ItemDetail />} />
 
-        {/* User */}
-        <Route
-          path="/dashboard"
-          element={
-            <PrivateRoute>
-              <Dashboard />
-            </PrivateRoute>
-          }
-        />
+          {/* User */}
+          <Route
+            path="/dashboard"
+            element={
+              <PrivateRoute>
+                <Dashboard />
+              </PrivateRoute>
+            }
+          />
 
-        <Route
-          path="/my-posts"
-          element={
-            <PrivateRoute>
-              <MyPosts />
-            </PrivateRoute>
-          }
-        />
+          <Route
+            path="/my-posts"
+            element={
+              <PrivateRoute>
+                <MyPosts />
+              </PrivateRoute>
+            }
+          />
 
-        {/* Admin */}
-        <Route
-          path="/admin"
-          element={
-            <AdminRoute>
-              <Admin />
-            </AdminRoute>
-          }
-        />
+          {/* Admin */}
+          <Route
+            path="/admin"
+            element={
+              <AdminRoute>
+                <Admin />
+              </AdminRoute>
+            }
+          />
 
-        <Route
-          path="/admin/users"
-          element={
-            <AdminRoute>
-              <UserManagement />
-            </AdminRoute>
-          }
-        />
-
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+          {/* Default */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Route>
       </Routes>
     </BrowserRouter>
   );

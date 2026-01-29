@@ -1,66 +1,60 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import api from "../services/api";
 import PostItem from "../components/PostItem";
+import toast from "react-hot-toast";
 
 export default function Dashboard() {
   const [items, setItems] = useState([]);
   const [filter, setFilter] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  const loadItems = () => {
-    api
-      .get("/items" + (filter ? `?type=${filter}` : ""))
-      .then(res => setItems(res.data))
-  };
-
- useEffect(() => {
-  api.get("/items")
-    .then(res => setItems(res.data))
-    .catch(err => {
+  const loadItems = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get("/items");
+      setItems(res.data);
+    } catch (err) {
       if (err.response?.status === 401) {
-        localStorage.removeItem("token");
+        localStorage.clear();
         window.location.href = "/login";
+      } else {
+        toast.error("Failed to load items");
       }
-    });
-}, []);
-
-  const logout = () => {
-    localStorage.removeItem("token");
-    window.location.href = "/login";
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const lostCount = items.filter(i => i.type === "lost").length;
-  const foundCount = items.filter(i => i.type === "found").length;
+  useEffect(() => {
+    loadItems();
+  }, []);
+
+  const filteredItems = filter
+    ? items.filter((i) => i.type === filter)
+    : items;
+
+  const lostCount = items.filter((i) => i.type === "lost").length;
+  const foundCount = items.filter((i) => i.type === "found").length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-6">
 
       {/* HERO */}
       <div className="bg-white rounded-xl shadow p-6 mb-8 animate-fadeInUp">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-extrabold">
-  <span className="text-blue-600">we</span>
-  <span className="text-gray-900">FOUND</span>
-  <span className="text-green-600">it</span>
-</h1>
+        <h1 className="text-3xl font-extrabold">
+          <span className="text-blue-600">we</span>
+          <span className="text-gray-900">FOUND</span>
+          <span className="text-green-600">it</span>
+        </h1>
 
-            <p className="text-yellow-600 text-sm mt-2">
-  Newly posted items require admin approval before appearing publicly.
-</p>
+        <p className="text-yellow-600 text-sm mt-2">
+          Newly posted items require admin approval before appearing publicly.
+        </p>
 
-            <p className="text-gray-600 mt-1">
-              Help reunite people with their belongings
-            </p>
-          </div>
-
-          <button
-            onClick={logout}
-            className="px-5 py-2 bg-red-500 text-white rounded-lg
-              hover:bg-red-600 hover:shadow-lg active:scale-95 transition"
-          >
-            Logout
-          </button>
-        </div>
+        <p className="text-gray-600 mt-1">
+          Help reunite people with their belongings
+        </p>
       </div>
 
       {/* STATS */}
@@ -71,7 +65,7 @@ export default function Dashboard() {
       </div>
 
       {/* POST ITEM */}
-      <div className="animate-fadeInUp">
+      <div className="animate-fadeInUp mb-8">
         <PostItem onPosted={loadItems} />
       </div>
 
@@ -81,7 +75,7 @@ export default function Dashboard() {
         <select
           className="border p-2 rounded-lg focus:ring-2 focus:ring-blue-400"
           value={filter}
-          onChange={e => setFilter(e.target.value)}
+          onChange={(e) => setFilter(e.target.value)}
         >
           <option value="">All</option>
           <option value="lost">Lost</option>
@@ -89,19 +83,16 @@ export default function Dashboard() {
         </select>
       </div>
 
-      {/* ITEMS GRID */}
-      {items.length === 0 ? (
+      {/* ITEMS */}
+      {loading ? (
+        <p className="text-center text-gray-500">Loading items...</p>
+      ) : filteredItems.length === 0 ? (
         <div className="text-center mt-20 animate-fadeInUp">
-          <p className="text-gray-500 text-lg">
-            No items found yet 🚀
-          </p>
-          <p className="text-gray-400 mt-2">
-            Be the first to post a lost or found item
-          </p>
+          <p className="text-gray-500 text-lg">No items found 🚀</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {items.map((item, i) => (
+          {filteredItems.map((item, i) => (
             <div
               key={item._id}
               style={{ animationDelay: `${i * 60}ms` }}
@@ -112,14 +103,18 @@ export default function Dashboard() {
               {item.image && (
                 <img
                   src={`http://localhost:5000/${item.image}`}
-                  alt=""
+                  alt={item.title}
                   className="h-40 w-full object-cover rounded-lg mb-3"
                 />
               )}
 
-              <h3 className="text-lg font-bold text-gray-800">
+              {/* PUBLIC ITEM DETAIL LINK */}
+              <Link
+                to={`/items/${item._id}`}
+                className="text-lg font-bold text-blue-600 hover:underline"
+              >
                 {item.title}
-              </h3>
+              </Link>
 
               <p className="text-gray-600 text-sm mt-1">
                 {item.description}
@@ -149,9 +144,9 @@ export default function Dashboard() {
   );
 }
 
-/* 🔹 Stat Card */
+/* STAT CARD */
 function StatCard({ title, value, color = "blue" }) {
-  const colorMap = {
+  const map = {
     blue: "text-blue-600 bg-blue-50",
     red: "text-red-600 bg-red-50",
     green: "text-green-600 bg-green-50"
@@ -159,8 +154,7 @@ function StatCard({ title, value, color = "blue" }) {
 
   return (
     <div
-      className={`rounded-xl p-5 shadow hover:shadow-lg transition
-        animate-fadeInUp ${colorMap[color]}`}
+      className={`rounded-xl p-5 shadow hover:shadow-lg transition animate-fadeInUp ${map[color]}`}
     >
       <p className="text-sm font-medium">{title}</p>
       <p className="text-3xl font-extrabold mt-2">{value}</p>

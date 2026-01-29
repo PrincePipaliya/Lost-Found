@@ -10,7 +10,6 @@ module.exports = (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // ✅ FORCE CONSISTENT STRUCTURE
     req.user = {
       id: decoded.id,
       role: decoded.role
@@ -18,6 +17,7 @@ module.exports = (req, res, next) => {
 
     next();
   } catch (err) {
+    console.error("AUTH ERROR:", err.message);
     return res.status(401).json({ message: "Invalid token" });
   }
 };

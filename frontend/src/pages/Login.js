@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
+import { successToast, errorToast } from "../utils/toast";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -11,28 +12,27 @@ export default function Login() {
   const [error, setError] = useState("");
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
+  e.preventDefault();
+  setLoading(true);
 
-    try {
-      const res = await api.post("/auth/login", {
-        email: email.trim().toLowerCase(),
-        password: password.trim()
-      });
+  try {
+    const res = await api.post("/auth/login", {
+      email: email.trim().toLowerCase(),
+      password,
+    });
 
-      // ✅ SAFE STORAGE
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("role", res.data.user.role);
-      localStorage.setItem("name", res.data.user.name);
+    localStorage.setItem("token", res.data.token);
+    localStorage.setItem("role", res.data.user.role);
+    localStorage.setItem("name", res.data.user.name);
 
-      navigate("/dashboard", { replace: true });
-    } catch (err) {
-      setError(err.response?.data?.message || "Login failed");
-    } finally {
-      setLoading(false);
-    }
-  };
+    successToast("Logged in successfully 🎉");
+    navigate("/dashboard");
+  } catch (err) {
+    errorToast(err.response?.data?.message || "Login failed");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 animate-fadeInUp">

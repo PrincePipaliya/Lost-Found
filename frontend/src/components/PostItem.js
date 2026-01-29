@@ -1,5 +1,6 @@
 import { useState } from "react";
 import api from "../services/api";
+import toast from "react-hot-toast";
 
 export default function PostItem({ onPosted }) {
   const [title, setTitle] = useState("");
@@ -7,14 +8,26 @@ export default function PostItem({ onPosted }) {
   const [type, setType] = useState("lost");
   const [contact, setContact] = useState("");
   const [image, setImage] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const isValidMobile = (number) => {
+    return /^[0-9]{10}$/.test(number);
+  };
 
   const submit = async (e) => {
     e.preventDefault();
 
     if (!title || !description || !contact) {
-      alert("All fields required");
+      toast.error("All fields are required");
       return;
     }
+
+    if (!isValidMobile(contact)) {
+      toast.error("Enter a valid 10-digit mobile number");
+      return;
+    }
+
+    setLoading(true);
 
     const form = new FormData();
     form.append("title", title);
@@ -25,40 +38,53 @@ export default function PostItem({ onPosted }) {
 
     try {
       await api.post("/items", form);
-      alert("Item posted");
+      toast.success("Item submitted for approval 🕒");
+
+      // reset
       setTitle("");
       setDescription("");
       setContact("");
       setImage(null);
-      onPosted();
+
+      if (onPosted) onPosted();
+
+      // refresh page after submit
+      setTimeout(() => {
+        window.location.reload();
+      }, 800);
+
     } catch {
-      alert("Post failed");
+      toast.error("Failed to submit item");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <form
       onSubmit={submit}
-      className="bg-white p-4 rounded shadow mb-6"
+      className="bg-white p-4 rounded shadow mb-6 animate-fadeInUp"
     >
       <h2 className="font-bold mb-3">Post Lost / Found Item</h2>
 
       <input
-        className="border p-2 w-full mb-2"
+        className="border p-2 w-full mb-2 rounded"
         placeholder="Title"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
+        required
       />
 
       <textarea
-        className="border p-2 w-full mb-2"
+        className="border p-2 w-full mb-2 rounded"
         placeholder="Description"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
+        required
       />
 
       <select
-        className="border p-2 w-full mb-2"
+        className="border p-2 w-full mb-2 rounded"
         value={type}
         onChange={(e) => setType(e.target.value)}
       >
@@ -72,15 +98,28 @@ export default function PostItem({ onPosted }) {
         onChange={(e) => setImage(e.target.files[0])}
       />
 
+      {/* 📱 MOBILE NUMBER FIELD */}
       <input
-        className="border p-2 w-full mb-3"
-        placeholder="Contact info"
+        type="tel"
+        inputMode="numeric"
+        pattern="[0-9]{10}"
+        maxLength="10"
+        className="border p-2 w-full mb-3 rounded"
+        placeholder="Mobile number (10 digits)"
         value={contact}
-        onChange={(e) => setContact(e.target.value)}
+        onChange={(e) =>
+          setContact(e.target.value.replace(/\D/g, ""))
+        }
+        required
       />
 
-      <button className="bg-blue-600 text-white px-4 py-2 rounded">
-        Submit
+      <button
+        disabled={loading}
+        className="bg-blue-600 text-white px-4 py-2 rounded
+          hover:bg-blue-700 active:scale-95 transition
+          disabled:opacity-60"
+      >
+        {loading ? "Submitting..." : "Submit"}
       </button>
     </form>
   );

@@ -14,8 +14,9 @@ root.render(
       toastOptions={{
         duration: 3000,
         style: {
-          fontSize: "14px"
-        }
+          background: "#1f2937",
+          color: "#fff",
+        },
       }}
     />
   </React.StrictMode>
