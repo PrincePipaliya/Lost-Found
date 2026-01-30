@@ -1,15 +1,35 @@
 const mongoose = require("mongoose");
 
-const ItemSchema = new mongoose.Schema({
-  title: {
-    type: String,
-    required: true
-  },
+const ClaimSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true
+    },
 
-  description: {
-    type: String,
-    required: true
+    answers: {
+      type: [String],
+      required: true
+    },
+
+    status: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending"
+    },
+
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
   },
+  { _id: false }
+);
+
+const ItemSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  description: { type: String, required: true },
 
   type: {
     type: String,
@@ -17,9 +37,7 @@ const ItemSchema = new mongoose.Schema({
     required: true
   },
 
-  image: {
-    type: String
-  },
+  image: String,
 
   contact: {
     type: String,
@@ -36,6 +54,19 @@ const ItemSchema = new mongoose.Schema({
     type: String,
     enum: ["pending", "approved"],
     default: "pending"
+  },
+
+  verificationQuestions: [
+    {
+      question: { type: String, required: true }
+    }
+  ],
+
+  claims: [ClaimSchema],
+
+  claimed: {
+    type: Boolean,
+    default: false
   },
 
   date: {

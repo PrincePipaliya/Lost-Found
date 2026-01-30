@@ -9,6 +9,31 @@ export default function PostItem({ onPosted }) {
   const [contact, setContact] = useState("");
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [questions, setQuestions] = useState([""]);
+  <h3 className="font-semibold mt-4">Verification Questions</h3>
+
+{questions.map((q, i) => (
+  <input
+    key={i}
+    value={q}
+    onChange={(e) => {
+      const copy = [...questions];
+      copy[i] = e.target.value;
+      setQuestions(copy);
+    }}
+    placeholder={`Question ${i + 1}`}
+    className="border p-2 w-full mb-2"
+  />
+))}
+
+<button
+  type="button"
+  onClick={() => setQuestions([...questions, ""])}
+  className="text-blue-600 text-sm"
+>
+  + Add question
+</button>
+
 
   const isValidMobile = (number) => {
     return /^[0-9]{10}$/.test(number);

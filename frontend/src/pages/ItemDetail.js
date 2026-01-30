@@ -6,14 +6,23 @@ import toast from "react-hot-toast";
 export default function ItemDetail() {
   const { id } = useParams();
   const [item, setItem] = useState(null);
+  const [answers, setAnswers] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const isLoggedIn = Boolean(localStorage.getItem("token"));
 
   useEffect(() => {
     const loadItem = async () => {
       try {
         const res = await api.get(`/items/${id}`);
         setItem(res.data);
-      } catch (err) {
+
+        if (res.data.verificationQuestions) {
+          setAnswers(
+            res.data.verificationQuestions.map(() => "")
+          );
+        }
+      } catch {
         toast.error("Item not found");
       } finally {
         setLoading(false);
@@ -23,12 +32,28 @@ export default function ItemDetail() {
     loadItem();
   }, [id]);
 
+  const submitClaim = async (e) => {
+    e.preventDefault();
+
+    if (answers.some(a => !a.trim())) {
+      toast.error("Please answer all questions");
+      return;
+    }
+
+    try {
+      await api.post(`/items/${id}/claim`, { answers });
+      toast.success("Claim submitted for review ✅");
+    } catch (err) {
+      toast.error(
+        err.response?.data?.message || "Failed to submit claim"
+      );
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500 text-lg animate-pulse">
-          Loading item details...
-        </p>
+        Loading...
       </div>
     );
   }
@@ -36,82 +61,78 @@ export default function ItemDetail() {
   if (!item) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center">
-        <p className="text-xl font-semibold text-gray-600">
-          Item not found
-        </p>
-        <Link
-          to="/dashboard"
-          className="mt-4 text-blue-600 hover:underline"
-        >
-          ← Back to dashboard
+        <p>Item not found</p>
+        <Link to="/dashboard" className="text-blue-600 mt-3">
+          ← Back
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-6">
-      <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-6 animate-fadeInUp">
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow animate-fadeInUp">
 
-        {/* BACK */}
-        <Link
-          to="/dashboard"
-          className="text-sm text-blue-600 hover:underline"
-        >
+        <Link to="/dashboard" className="text-blue-600 text-sm">
           ← Back
         </Link>
 
-        {/* IMAGE */}
         {item.image && (
           <img
             src={`http://localhost:5000/${item.image}`}
             alt={item.title}
-            className="w-full h-80 object-cover rounded-lg mt-4 mb-6"
+            className="w-full h-80 object-cover rounded-lg mt-4"
           />
         )}
 
-        {/* TITLE */}
-        <h1 className="text-3xl font-extrabold text-gray-800">
-          {item.title}
-        </h1>
+        <h1 className="text-3xl font-bold mt-4">{item.title}</h1>
 
-        {/* TYPE + STATUS */}
-        <div className="flex items-center gap-3 mt-3">
-          <span
-            className={`px-3 py-1 text-sm font-bold rounded-full
-              ${
-                item.type === "lost"
-                  ? "bg-red-100 text-red-600"
-                  : "bg-green-100 text-green-600"
-              }`}
-          >
-            {item.type.toUpperCase()}
-          </span>
+        <p className="mt-4 text-gray-700">{item.description}</p>
 
-          <span
-            className={`px-3 py-1 text-sm font-bold rounded-full
-              ${
-                item.status === "approved"
-                  ? "bg-green-100 text-green-700"
-                  : "bg-yellow-100 text-yellow-700"
-              }`}
-          >
-            {item.status.toUpperCase()}
-          </span>
+        <div className="mt-6">
+          <span className="font-semibold">Type:</span>{" "}
+          {item.type.toUpperCase()}
         </div>
 
-        {/* DESCRIPTION */}
-        <p className="text-gray-700 mt-6 leading-relaxed">
-          {item.description}
-        </p>
+        {/* 🔐 CLAIM FORM */}
+        {isLoggedIn &&
+          item.verificationQuestions?.length > 0 &&
+          !item.claimed && (
+            <form
+              onSubmit={submitClaim}
+              className="mt-8 border-t pt-6"
+            >
+              <h2 className="text-xl font-bold mb-4">
+                Verify Ownership
+              </h2>
 
-        {/* CONTACT */}
-        <div className="mt-6 border-t pt-4">
-          <p className="text-sm text-gray-500">Contact Information</p>
-          <p className="text-lg font-semibold text-gray-800 mt-1">
-            {item.contact}
+              {item.verificationQuestions.map((q, i) => (
+                <input
+                  key={i}
+                  value={answers[i]}
+                  onChange={(e) => {
+                    const copy = [...answers];
+                    copy[i] = e.target.value;
+                    setAnswers(copy);
+                  }}
+                  placeholder={q.question}
+                  className="border p-2 w-full mb-3 rounded"
+                />
+              ))}
+
+              <button
+                className="bg-blue-600 text-white px-4 py-2 rounded"
+              >
+                Submit Claim
+              </button>
+            </form>
+          )}
+
+        {item.claimed && (
+          <p className="mt-6 text-green-600 font-semibold">
+            ✔ This item has been claimed
           </p>
-        </div>
+        )}
       </div>
     </div>
   );

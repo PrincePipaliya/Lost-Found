@@ -2,7 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Fade up (used across pages) */
+/* =====================
+   GLOBAL ANIMATIONS
+===================== */
+
+/* Fade up */
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -13,12 +17,11 @@
     transform: translateY(0);
   }
 }
-
 .animate-fadeInUp {
   animation: fadeInUp 0.6s ease-out both;
 }
 
-/* Slide down navbar */
+/* Slide down (Navbar) */
 @keyframes slideDown {
   from {
     opacity: 0;
@@ -29,12 +32,11 @@
     transform: translateY(0);
   }
 }
-
 .animate-slideDown {
   animation: slideDown 0.4s ease-out both;
 }
 
-/* Fade mobile menu */
+/* Fade in (Mobile menu) */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -45,12 +47,11 @@
     transform: translateY(0);
   }
 }
-
 .animate-fadeIn {
   animation: fadeIn 0.3s ease-out both;
 }
 
-/* Card entrance animation (IMPORTANT) */
+/* Card animation */
 @keyframes cardFade {
   from {
     opacity: 0;
@@ -61,12 +62,13 @@
     transform: scale(1);
   }
 }
-
 .animate-cardFade {
   animation: cardFade 0.4s ease-out both;
 }
 
-/* Hamburger animation */
+/* =====================
+   HAMBURGER MENU
+===================== */
 .hamburger {
   width: 24px;
   height: 3px;
@@ -78,11 +80,67 @@
 .hamburger.open:nth-child(1) {
   transform: rotate(45deg) translate(5px, 5px);
 }
-
 .hamburger.open:nth-child(2) {
   opacity: 0;
 }
-
 .hamburger.open:nth-child(3) {
   transform: rotate(-45deg) translate(6px, -6px);
+}
+
+/* =====================
+   LOGIN PAGE BACKGROUND
+===================== */
+
+/* Gradient animation */
+@keyframes gradientMove {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animated-bg {
+  background: linear-gradient(
+    -45deg,
+    #2563eb,
+    #4f46e5,
+    #7c3aed,
+    #0ea5e9
+  );
+  background-size: 400% 400%;
+  animation: gradientMove 12s ease infinite;
+}
+
+/* =====================
+   FLOATING BLOBS
+===================== */
+@keyframes blob {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+.animate-blob {
+  animation: blob 10s infinite ease-in-out;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+.animation-delay-4000 {
+  animation-delay: 4s;
 }

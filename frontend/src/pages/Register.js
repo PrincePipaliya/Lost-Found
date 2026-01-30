@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import api from "../services/api";
 import toast from "react-hot-toast";
+import { Mail, Lock, User, Loader2 } from "lucide-react";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -16,27 +17,25 @@ export default function Register() {
     setLoading(true);
 
     try {
-      // 1️⃣ Register user
+      // 1️⃣ Register
       await api.post("/auth/register", {
         name: name.trim(),
         email: email.trim().toLowerCase(),
-        password: password.trim()
+        password: password.trim(),
       });
 
-      // 2️⃣ Auto-login after register
+      // 2️⃣ Auto-login
       const res = await api.post("/auth/login", {
         email: email.trim().toLowerCase(),
-        password: password.trim()
+        password: password.trim(),
       });
 
-      // 3️⃣ Save auth data
+      // 3️⃣ Save auth
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("role", res.data.user.role);
       localStorage.setItem("name", res.data.user.name);
 
-      toast.success("Account created successfully 🎉");
-
-      // 4️⃣ Redirect
+      toast.success("Welcome! Your account is ready 🎉");
       navigate("/dashboard", { replace: true });
     } catch (err) {
       toast.error(
@@ -48,65 +47,113 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 animate-fadeInUp">
+    <div className="min-h-screen animated-bg relative flex items-center justify-center overflow-hidden">
+
+      {/* 🌈 Animated Gradient */}
+      <div className="absolute inset-0 animate-gradient" />
+
+      {/* 🔮 Floating Blobs */}
+      <div className="absolute -top-20 -left-20 w-72 h-72 bg-pink-400 rounded-full blur-3xl opacity-40 animate-blob" />
+      <div className="absolute top-1/3 -right-20 w-72 h-72 bg-blue-400 rounded-full blur-3xl opacity-40 animate-blob animation-delay-2000" />
+      <div className="absolute bottom-20 left-1/3 w-72 h-72 bg-purple-400 rounded-full blur-3xl opacity-40 animate-blob animation-delay-4000" />
+
+      {/* 🧊 Glass Card */}
       <form
         onSubmit={handleSubmit}
-        className="bg-white p-8 rounded-xl shadow-md w-full max-w-md"
+        className="relative z-10 w-full max-w-md
+          bg-white/20 backdrop-blur-xl
+          border border-white/30
+          rounded-2xl shadow-2xl
+          p-8 animate-fadeInUp"
       >
-        <h1 className="text-2xl font-extrabold mb-6 text-center">
-          Create your{" "}
-          <span className="text-blue-600">we</span>
-          <span className="text-gray-900">FOUND</span>
-          <span className="text-green-600">it</span>{" "}
-          account
+        {/* Logo */}
+        <h1 className="text-3xl font-extrabold text-center mb-2 text-white">
+          <span className="text-blue-200">we</span>
+          <span className="text-white">FOUND</span>
+          <span className="text-green-300">it</span>
         </h1>
 
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">Name</label>
+        <p className="text-center text-white/80 mb-8">
+          Create your account
+        </p>
+
+        {/* Name */}
+        <div className="mb-4 relative">
+          <User className="absolute left-3 top-3.5 text-white/70" size={18} />
           <input
             type="text"
+            required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            required
-            className="w-full border px-3 py-2 rounded focus:ring focus:ring-blue-300"
+            placeholder="Full name"
+            className="w-full pl-10 pr-3 py-2.5 rounded-lg
+              bg-white/20 text-white placeholder-white/70
+              border border-white/30
+              focus:outline-none focus:ring-2 focus:ring-white/60
+              transition"
           />
         </div>
 
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">Email</label>
+        {/* Email */}
+        <div className="mb-4 relative">
+          <Mail className="absolute left-3 top-3.5 text-white/70" size={18} />
           <input
             type="email"
+            required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            required
-            className="w-full border px-3 py-2 rounded focus:ring focus:ring-blue-300"
+            placeholder="Email address"
+            className="w-full pl-10 pr-3 py-2.5 rounded-lg
+              bg-white/20 text-white placeholder-white/70
+              border border-white/30
+              focus:outline-none focus:ring-2 focus:ring-white/60
+              transition"
           />
         </div>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium mb-1">Password</label>
+        {/* Password */}
+        <div className="mb-6 relative">
+          <Lock className="absolute left-3 top-3.5 text-white/70" size={18} />
           <input
             type="password"
+            required
+            minLength={6}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            required
-            className="w-full border px-3 py-2 rounded focus:ring focus:ring-blue-300"
+            placeholder="Password (min 6 characters)"
+            className="w-full pl-10 pr-3 py-2.5 rounded-lg
+              bg-white/20 text-white placeholder-white/70
+              border border-white/30
+              focus:outline-none focus:ring-2 focus:ring-white/60
+              transition"
           />
         </div>
 
+        {/* Submit */}
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2 rounded bg-blue-600 text-white
-            hover:bg-blue-700 active:scale-95 transition
+          className="w-full flex items-center justify-center gap-2
+            py-2.5 rounded-lg
+            bg-white text-indigo-700 font-bold
+            hover:bg-indigo-50
+            active:scale-95 transition
             disabled:opacity-60"
         >
-          {loading ? "Creating account..." : "Register"}
+          {loading ? (
+            <>
+              <Loader2 className="animate-spin" size={18} />
+              Creating account...
+            </>
+          ) : (
+            "Register"
+          )}
         </button>
 
-        <p className="text-sm text-center text-gray-500 mt-4">
+        {/* Login */}
+        <p className="mt-6 text-center text-white/80 text-sm">
           Already have an account?{" "}
-          <Link to="/login" className="text-blue-600 hover:underline">
+          <Link to="/login" className="font-semibold underline">
             Login
           </Link>
         </p>

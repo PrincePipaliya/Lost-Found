@@ -7,9 +7,12 @@ import Admin from "./pages/Admin";
 import MyPosts from "./pages/MyPosts";
 import About from "./pages/About";
 import HowItWorks from "./pages/HowItWorks";
-import Contact from "./pages/Contact";
 import ItemDetail from "./pages/ItemDetail";
 import Layout from "./Layout";
+
+/* =====================
+   AUTH GUARDS
+===================== */
 
 /* Logged-in users */
 const PrivateRoute = ({ children }) => {
@@ -32,18 +35,23 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Layout ALWAYS renders Navbar */}
+
+        {/* 🔹 Layout ALWAYS renders Navbar */}
         <Route element={<Layout />}>
 
-          {/* Public */}
+          {/* ===== PUBLIC ===== */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+
+          {/* ✅ SINGLE PAGE: About + Contact */}
           <Route path="/about" element={<About />} />
+
           <Route path="/how-it-works" element={<HowItWorks />} />
-          <Route path="/contact" element={<Contact />} />
+
+          {/* Public item detail */}
           <Route path="/items/:id" element={<ItemDetail />} />
 
-          {/* User */}
+          {/* ===== USER ===== */}
           <Route
             path="/dashboard"
             element={
@@ -62,7 +70,7 @@ export default function App() {
             }
           />
 
-          {/* Admin */}
+          {/* ===== ADMIN ===== */}
           <Route
             path="/admin"
             element={
@@ -72,9 +80,10 @@ export default function App() {
             }
           />
 
-          {/* Default */}
+          {/* ===== DEFAULT ===== */}
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="*" element={<Navigate to="/login" replace />} />
+
         </Route>
       </Routes>
     </BrowserRouter>

@@ -5,21 +5,26 @@ import toast from "react-hot-toast";
 export default function Admin() {
   const [items, setItems] = useState([]);
   const [users, setUsers] = useState([]);
+  const [claims, setClaims] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const myEmail = localStorage.getItem("email");
 
-  /* LOAD DATA */
+  /* ================= LOAD DATA ================= */
+
   const loadData = async () => {
     try {
       setLoading(true);
-      const [itemsRes, usersRes] = await Promise.all([
+
+      const [itemsRes, usersRes, claimsRes] = await Promise.all([
         api.get("/items"),
-        api.get("/users")
+        api.get("/users"),
+        api.get("/items/claims/all")
       ]);
 
       setItems(itemsRes.data);
       setUsers(usersRes.data);
+      setClaims(claimsRes.data);
     } catch (err) {
       if (err.response?.status === 401) {
         localStorage.clear();
@@ -43,7 +48,7 @@ export default function Admin() {
       await api.put(`/items/${id}/approve`);
       toast.success("Item approved");
       loadData();
-    } catch (err) {
+    } catch {
       toast.error("Failed to approve item");
     }
   };
@@ -56,14 +61,31 @@ export default function Admin() {
       toast.success("Item deleted");
       loadData();
     } catch (err) {
-      if (err.response?.status === 401) {
-        localStorage.clear();
-        window.location.href = "/login";
-      } else {
-        toast.error(
-          err.response?.data?.message || "Failed to delete item"
-        );
-      }
+      toast.error(
+        err.response?.data?.message || "Failed to delete item"
+      );
+    }
+  };
+
+  /* ================= CLAIM ACTIONS ================= */
+
+  const approveClaim = async (itemId, claimIndex) => {
+    try {
+      await api.put(`/items/${itemId}/claim/${claimIndex}/approve`);
+      toast.success("Claim approved");
+      loadData();
+    } catch {
+      toast.error("Failed to approve claim");
+    }
+  };
+
+  const rejectClaim = async (itemId, claimIndex) => {
+    try {
+      await api.put(`/items/${itemId}/claim/${claimIndex}/reject`);
+      toast.success("Claim rejected");
+      loadData();
+    } catch {
+      toast.error("Failed to reject claim");
     }
   };
 
@@ -102,9 +124,7 @@ export default function Admin() {
 
       {/* ================= ITEMS ================= */}
       <section>
-        <h2 className="text-2xl font-bold mb-4">
-          Items
-        </h2>
+        <h2 className="text-2xl font-bold mb-4">Items</h2>
 
         {items.length === 0 ? (
           <p className="text-gray-500">No items found.</p>
@@ -128,8 +148,7 @@ export default function Admin() {
                   {item.status === "pending" && (
                     <button
                       onClick={() => approveItem(item._id)}
-                      className="px-3 py-1 bg-green-500 text-white rounded
-                        hover:bg-green-600 transition"
+                      className="px-3 py-1 bg-green-500 text-white rounded"
                     >
                       Approve
                     </button>
@@ -137,12 +156,80 @@ export default function Admin() {
 
                   <button
                     onClick={() => deleteItem(item._id)}
-                    className="px-3 py-1 bg-red-500 text-white rounded
-                      hover:bg-red-600 transition"
+                    className="px-3 py-1 bg-red-500 text-white rounded"
                   >
                     Delete
                   </button>
                 </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ================= CLAIMS ================= */}
+      <section>
+        <h2 className="text-2xl font-bold mb-4">
+          Claim Requests
+        </h2>
+
+        {claims.length === 0 ? (
+          <p className="text-gray-500">
+            No claim requests yet.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {claims.map((item) => (
+              <div
+                key={item._id}
+                className="bg-white p-4 rounded-xl shadow"
+              >
+                <h3 className="font-bold text-lg">
+                  {item.title}
+                </h3>
+
+                {item.claims.map((claim, index) => (
+                  <div
+                    key={index}
+                    className="border rounded p-3 mt-3"
+                  >
+                    <p className="font-semibold">
+                      Claimed by: {claim.userId.name}
+                    </p>
+
+                    <ul className="list-disc ml-5 mt-2 text-sm">
+                      {claim.answers.map((ans, i) => (
+                        <li key={i}>{ans}</li>
+                      ))}
+                    </ul>
+
+                    {claim.status === "pending" ? (
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={() =>
+                            approveClaim(item._id, index)
+                          }
+                          className="bg-green-600 text-white px-3 py-1 rounded"
+                        >
+                          Approve
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            rejectClaim(item._id, index)
+                          }
+                          className="bg-red-600 text-white px-3 py-1 rounded"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-sm text-gray-500">
+                        Status: {claim.status.toUpperCase()}
+                      </p>
+                    )}
+                  </div>
+                ))}
               </div>
             ))}
           </div>

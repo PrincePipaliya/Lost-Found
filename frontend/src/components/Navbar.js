@@ -5,16 +5,21 @@ export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const pathname = location.pathname || "/";
+
+  // 🔐 Auth data
   const token = localStorage.getItem("token");
   const role = localStorage.getItem("role");
   const name = localStorage.getItem("name");
 
-  const isLoggedIn = Boolean(token);
+  // 🚫 Force PUBLIC navbar on auth pages
+  const isAuthPage =
+    pathname === "/login" || pathname === "/register";
+
+  const isLoggedIn = Boolean(token) && !isAuthPage;
   const isAdmin = role === "admin";
 
   const [open, setOpen] = useState(false);
-
-  const pathname = location?.pathname || "";
 
   const logout = () => {
     localStorage.clear();
@@ -27,9 +32,11 @@ export default function Navbar() {
       to={to}
       onClick={() => setOpen(false)}
       className={`block px-4 py-2 text-lg font-medium transition
-        ${pathname === to
-          ? "text-blue-600"
-          : "text-gray-700 hover:text-blue-600"}`}
+        ${
+          pathname === to
+            ? "text-blue-600"
+            : "text-gray-700 hover:text-blue-600"
+        }`}
     >
       {children}
     </Link>
@@ -39,10 +46,10 @@ export default function Navbar() {
     <nav className="bg-white shadow-md sticky top-0 z-50 animate-slideDown">
       <div className="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
 
-        {/* LOGO (ALWAYS VISIBLE) */}
+        {/* LOGO */}
         <Link
           to={isLoggedIn ? "/dashboard" : "/login"}
-          className="text-2xl font-extrabold tracking-wide"
+          className="text-2xl font-extrabold tracking-wide hover:scale-105 transition-transform"
         >
           <span className="text-blue-600">we</span>
           <span className="text-gray-900">FOUND</span>
@@ -52,31 +59,43 @@ export default function Navbar() {
         {/* DESKTOP MENU */}
         <div className="hidden md:flex items-center gap-4">
 
-          {/* PUBLIC */}
-          <DesktopLink to="/about" active={pathname === "/about"}>About</DesktopLink>
-          <DesktopLink to="/how-it-works" active={pathname === "/how-it-works"}>How It Works</DesktopLink>
-          <DesktopLink to="/contact" active={pathname === "/contact"}>Contact</DesktopLink>
+          {/* ✅ SINGLE INFO PAGE */}
+          <DesktopLink to="/about" active={pathname === "/about"}>
+            About
+          </DesktopLink>
 
-          {/* LOGGED OUT */}
           {!isLoggedIn && (
             <>
-              <DesktopLink to="/login" active={pathname === "/login"}>Login</DesktopLink>
-              <DesktopLink to="/register" active={pathname === "/register"}>Register</DesktopLink>
+              <DesktopLink to="/login" active={pathname === "/login"}>
+                Login
+              </DesktopLink>
+              <DesktopLink to="/register" active={pathname === "/register"}>
+                Register
+              </DesktopLink>
             </>
           )}
 
-          {/* LOGGED IN */}
           {isLoggedIn && (
             <>
-              <DesktopLink to="/dashboard" active={pathname === "/dashboard"}>Dashboard</DesktopLink>
-              <DesktopLink to="/my-posts" active={pathname === "/my-posts"}>My Posts</DesktopLink>
+              <DesktopLink to="/dashboard" active={pathname === "/dashboard"}>
+                Dashboard
+              </DesktopLink>
+
+              <DesktopLink to="/my-posts" active={pathname === "/my-posts"}>
+                My Posts
+              </DesktopLink>
 
               {isAdmin && (
-                <DesktopLink to="/admin" active={pathname === "/admin"}>Admin</DesktopLink>
+                <DesktopLink to="/admin" active={pathname === "/admin"}>
+                  Admin
+                </DesktopLink>
               )}
 
+              {/* USER INFO */}
               <div className="flex items-center gap-2 ml-3">
-                <span className="font-semibold text-gray-700">{name || "User"}</span>
+                <span className="font-semibold text-gray-700">
+                  {name || "User"}
+                </span>
                 {isAdmin && (
                   <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-purple-100 text-purple-700">
                     ADMIN
@@ -87,7 +106,7 @@ export default function Navbar() {
               <button
                 onClick={logout}
                 className="ml-3 px-4 py-2 rounded bg-red-500 text-white
-                  hover:bg-red-600 transition"
+                  hover:bg-red-600 hover:shadow-lg active:scale-95 transition"
               >
                 Logout
               </button>
@@ -112,9 +131,8 @@ export default function Navbar() {
           ${open ? "max-h-96 opacity-100" : "max-h-0 opacity-0"}`}
       >
         <div className="bg-white border-t py-4 space-y-2 animate-fadeIn">
+
           <NavItem to="/about">About</NavItem>
-          <NavItem to="/how-it-works">How It Works</NavItem>
-          <NavItem to="/contact">Contact</NavItem>
 
           {!isLoggedIn && (
             <>
@@ -131,7 +149,8 @@ export default function Navbar() {
 
               <button
                 onClick={logout}
-                className="block w-full text-left px-4 py-2 text-lg text-red-600"
+                className="block w-full text-left px-4 py-2 text-lg
+                  text-red-600 hover:bg-red-50 transition"
               >
                 Logout
               </button>
