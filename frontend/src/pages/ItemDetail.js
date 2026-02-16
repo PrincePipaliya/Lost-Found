@@ -5,9 +5,12 @@ import toast from "react-hot-toast";
 
 export default function ItemDetail() {
   const { id } = useParams();
+
   const [item, setItem] = useState(null);
   const [answers, setAnswers] = useState([]);
+  const [confidence, setConfidence] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [submitted, setSubmitted] = useState(false);
 
   const isLoggedIn = Boolean(localStorage.getItem("token"));
 
@@ -17,10 +20,8 @@ export default function ItemDetail() {
         const res = await api.get(`/items/${id}`);
         setItem(res.data);
 
-        if (res.data.verificationQuestions) {
-          setAnswers(
-            res.data.verificationQuestions.map(() => "")
-          );
+        if (res.data.verificationQuestions?.length > 0) {
+          setAnswers(res.data.verificationQuestions.map(() => ""));
         }
       } catch {
         toast.error("Item not found");
@@ -41,8 +42,12 @@ export default function ItemDetail() {
     }
 
     try {
-      await api.post(`/items/${id}/claim`, { answers });
-      toast.success("Claim submitted for review ✅");
+      const res = await api.post(`/items/${id}/claim`, { answers });
+
+      setConfidence(res.data.confidence);
+      setSubmitted(true);
+
+      toast.success("Claim submitted successfully");
     } catch (err) {
       toast.error(
         err.response?.data?.message || "Failed to submit claim"
@@ -89,50 +94,80 @@ export default function ItemDetail() {
 
         <p className="mt-4 text-gray-700">{item.description}</p>
 
-        <div className="mt-6">
-          <span className="font-semibold">Type:</span>{" "}
-          {item.type.toUpperCase()}
+        <div className="mt-4 font-semibold">
+          Type: {item.type.toUpperCase()}
         </div>
 
-        {/* 🔐 CLAIM FORM */}
+        {/* ================= CLAIM SECTION ================= */}
+
         {isLoggedIn &&
           item.verificationQuestions?.length > 0 &&
-          !item.claimed && (
-            <form
-              onSubmit={submitClaim}
-              className="mt-8 border-t pt-6"
-            >
+          !item.claimed &&
+          !submitted && (
+            <form onSubmit={submitClaim} className="mt-8 border-t pt-6">
+
               <h2 className="text-xl font-bold mb-4">
-                Verify Ownership
+                🔐 Verify Ownership
               </h2>
 
               {item.verificationQuestions.map((q, i) => (
-                <input
-                  key={i}
-                  value={answers[i]}
-                  onChange={(e) => {
-                    const copy = [...answers];
-                    copy[i] = e.target.value;
-                    setAnswers(copy);
-                  }}
-                  placeholder={q.question}
-                  className="border p-2 w-full mb-3 rounded"
-                />
+                <div key={i} className="mb-4">
+                  <label className="block font-medium mb-1">
+                    {q.question}
+                  </label>
+                  <input
+                    value={answers[i]}
+                    onChange={(e) => {
+                      const copy = [...answers];
+                      copy[i] = e.target.value;
+                      setAnswers(copy);
+                    }}
+                    className="border p-2 w-full rounded"
+                    placeholder="Your answer..."
+                  />
+                </div>
               ))}
 
-              <button
-                className="bg-blue-600 text-white px-4 py-2 rounded"
-              >
+              <button className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
                 Submit Claim
               </button>
             </form>
           )}
+
+        {/* ================= RESULT ================= */}
+
+        {submitted && (
+          <div className="mt-6 p-4 rounded-lg bg-blue-50 border">
+            <h3 className="font-bold text-lg">
+              AI Confidence Score: {confidence}%
+            </h3>
+
+            {confidence >= 80 ? (
+              <p className="text-green-600 mt-2">
+                High ownership confidence 👍
+              </p>
+            ) : confidence >= 50 ? (
+              <p className="text-yellow-600 mt-2">
+                Moderate confidence
+              </p>
+            ) : (
+              <p className="text-red-600 mt-2">
+                Low confidence
+              </p>
+            )}
+
+            <p className="text-sm mt-2 text-gray-500">
+              Admin will review your claim.
+            </p>
+          </div>
+        )}
 
         {item.claimed && (
           <p className="mt-6 text-green-600 font-semibold">
             ✔ This item has been claimed
           </p>
         )}
+
       </div>
     </div>
   );

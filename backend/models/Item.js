@@ -1,5 +1,8 @@
 const mongoose = require("mongoose");
 
+/* =========================
+   CLAIM SCHEMA
+========================= */
 const ClaimSchema = new mongoose.Schema(
   {
     userId: {
@@ -11,6 +14,16 @@ const ClaimSchema = new mongoose.Schema(
     answers: {
       type: [String],
       required: true
+    },
+
+    score: {
+      type: Number,
+      default: 0
+    },
+
+    confidence: {
+      type: Number,
+      default: 0
     },
 
     status: {
@@ -27,6 +40,9 @@ const ClaimSchema = new mongoose.Schema(
   { _id: false }
 );
 
+/* =========================
+   ITEM SCHEMA
+========================= */
 const ItemSchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: { type: String, required: true },
@@ -56,9 +72,11 @@ const ItemSchema = new mongoose.Schema({
     default: "pending"
   },
 
+  /* 🔐 SMART VERIFICATION QUESTIONS */
   verificationQuestions: [
     {
-      question: { type: String, required: true }
+      question: { type: String, required: true },
+      correctAnswer: { type: String, required: true } // hidden from public
     }
   ],
 
