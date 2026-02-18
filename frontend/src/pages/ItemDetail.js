@@ -5,14 +5,25 @@ import toast from "react-hot-toast";
 
 export default function ItemDetail() {
   const { id } = useParams();
-
   const [item, setItem] = useState(null);
   const [answers, setAnswers] = useState([]);
-  const [confidence, setConfidence] = useState(null);
+  const [myClaim, setMyClaim] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [submitted, setSubmitted] = useState(false);
 
-  const isLoggedIn = Boolean(localStorage.getItem("token"));
+  const token = localStorage.getItem("token");
+  const isLoggedIn = Boolean(token);
+
+  // 🔐 Decode logged-in user ID safely
+  let loggedInUserId = null;
+  if (token) {
+    try {
+      loggedInUserId = JSON.parse(
+        atob(token.split(".")[1])
+      ).id;
+    } catch {
+      loggedInUserId = null;
+    }
+  }
 
   useEffect(() => {
     const loadItem = async () => {
@@ -23,6 +34,21 @@ export default function ItemDetail() {
         if (res.data.verificationQuestions?.length > 0) {
           setAnswers(res.data.verificationQuestions.map(() => ""));
         }
+
+        // 🔎 Detect if user already submitted claim
+        if (isLoggedIn && res.data.claims) {
+          const existingClaim = res.data.claims.find(
+            (c) =>
+              (typeof c.userId === "string"
+                ? c.userId
+                : c.userId?._id) === loggedInUserId
+          );
+
+          if (existingClaim) {
+            setMyClaim(existingClaim);
+          }
+        }
+
       } catch {
         toast.error("Item not found");
       } finally {
@@ -36,18 +62,22 @@ export default function ItemDetail() {
   const submitClaim = async (e) => {
     e.preventDefault();
 
-    if (answers.some(a => !a.trim())) {
+    if (answers.some((a) => !a.trim())) {
       toast.error("Please answer all questions");
       return;
     }
 
     try {
-      const res = await api.post(`/items/${id}/claim`, { answers });
+      const res = await api.post(`/items/${id}/claim`, {
+        answers,
+      });
 
-      setConfidence(res.data.confidence);
-      setSubmitted(true);
+      toast.success(
+        `Claim submitted! AI Confidence: ${res.data.confidence}%`
+      );
 
-      toast.success("Claim submitted successfully");
+      window.location.reload();
+
     } catch (err) {
       toast.error(
         err.response?.data?.message || "Failed to submit claim"
@@ -58,61 +88,99 @@ export default function ItemDetail() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        Loading...
+        Loading item...
       </div>
     );
   }
 
   if (!item) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center">
-        <p>Item not found</p>
-        <Link to="/dashboard" className="text-blue-600 mt-3">
-          ← Back
-        </Link>
+      <div className="min-h-screen flex items-center justify-center">
+        Item not found
       </div>
     );
   }
 
+  // 🔐 Detect if logged-in user is item owner
+  const isOwner =
+    loggedInUserId &&
+    item.userId &&
+    (typeof item.userId === "string"
+      ? item.userId
+      : item.userId._id) === loggedInUserId;
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow animate-fadeInUp">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-6">
+      <div className="max-w-4xl mx-auto bg-white p-8 rounded-2xl shadow-lg animate-fadeInUp">
 
         <Link to="/dashboard" className="text-blue-600 text-sm">
           ← Back
         </Link>
 
+        {/* IMAGE */}
         {item.image && (
           <img
             src={`http://localhost:5000/${item.image}`}
             alt={item.title}
-            className="w-full h-80 object-cover rounded-lg mt-4"
+            className="w-full h-80 object-cover rounded-xl mt-4"
           />
         )}
 
-        <h1 className="text-3xl font-bold mt-4">{item.title}</h1>
+        {/* TITLE */}
+        <h1 className="text-3xl font-bold mt-6">
+          {item.title}
+        </h1>
 
-        <p className="mt-4 text-gray-700">{item.description}</p>
+        <p className="mt-4 text-gray-700">
+          {item.description}
+        </p>
 
-        <div className="mt-4 font-semibold">
-          Type: {item.type.toUpperCase()}
+        {/* BADGES */}
+        <div className="mt-4 flex gap-3">
+          <span className={`px-3 py-1 rounded-full text-sm font-bold
+            ${item.type === "lost"
+              ? "bg-red-100 text-red-600"
+              : "bg-green-100 text-green-600"
+            }`}>
+            {item.type.toUpperCase()}
+          </span>
+
+          {item.claimed && (
+            <span className="px-3 py-1 rounded-full text-sm font-bold bg-green-100 text-green-700">
+              CLAIMED
+            </span>
+          )}
         </div>
 
-        {/* ================= CLAIM SECTION ================= */}
+        {/* CONTACT (only shown if backend allows) */}
+        {item.contact && (
+          <div className="mt-6 border-t pt-4">
+            <p className="text-sm text-gray-500">
+              Contact Information
+            </p>
+            <p className="text-lg font-semibold">
+              {item.contact}
+            </p>
+          </div>
+        )}
 
+        {/* ================= CLAIM FORM ================= */}
         {isLoggedIn &&
-          item.verificationQuestions?.length > 0 &&
+          !isOwner &&           // ❌ OWNER CANNOT CLAIM
           !item.claimed &&
-          !submitted && (
-            <form onSubmit={submitClaim} className="mt-8 border-t pt-6">
-
+          item.verificationQuestions?.length > 0 &&
+          !myClaim && (
+            <form
+              onSubmit={submitClaim}
+              className="mt-10 border-t pt-6"
+            >
               <h2 className="text-xl font-bold mb-4">
-                🔐 Verify Ownership
+                🔐 AI Ownership Verification
               </h2>
 
               {item.verificationQuestions.map((q, i) => (
                 <div key={i} className="mb-4">
-                  <label className="block font-medium mb-1">
+                  <label className="block mb-1 font-medium">
                     {q.question}
                   </label>
                   <input
@@ -122,50 +190,53 @@ export default function ItemDetail() {
                       copy[i] = e.target.value;
                       setAnswers(copy);
                     }}
-                    className="border p-2 w-full rounded"
-                    placeholder="Your answer..."
+                    className="w-full border p-2 rounded"
                   />
                 </div>
               ))}
 
-              <button className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+              <button className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition">
                 Submit Claim
               </button>
             </form>
           )}
 
-        {/* ================= RESULT ================= */}
-
-        {submitted && (
-          <div className="mt-6 p-4 rounded-lg bg-blue-50 border">
-            <h3 className="font-bold text-lg">
-              AI Confidence Score: {confidence}%
-            </h3>
-
-            {confidence >= 80 ? (
-              <p className="text-green-600 mt-2">
-                High ownership confidence 👍
-              </p>
-            ) : confidence >= 50 ? (
-              <p className="text-yellow-600 mt-2">
-                Moderate confidence
-              </p>
-            ) : (
-              <p className="text-red-600 mt-2">
-                Low confidence
-              </p>
-            )}
-
-            <p className="text-sm mt-2 text-gray-500">
-              Admin will review your claim.
+        {/* ================= OWNER MESSAGE ================= */}
+        {isOwner && (
+          <div className="mt-8 p-4 bg-blue-50 rounded-lg">
+            <p className="font-semibold text-blue-700">
+              You posted this item.
             </p>
           </div>
         )}
 
-        {item.claimed && (
-          <p className="mt-6 text-green-600 font-semibold">
-            ✔ This item has been claimed
-          </p>
+        {/* ================= CLAIM STATUS ================= */}
+        {myClaim && (
+          <div className="mt-8 p-4 bg-gray-50 rounded-lg">
+            <h3 className="font-bold mb-2">
+              Your Claim Status
+            </h3>
+
+            <p>
+              AI Confidence:{" "}
+              <span className="font-semibold">
+                {myClaim.confidence}%
+              </span>
+            </p>
+
+            <p className="mt-2">
+              Status:{" "}
+              <span className={`font-semibold
+                ${myClaim.status === "approved"
+                  ? "text-green-600"
+                  : myClaim.status === "rejected"
+                  ? "text-red-600"
+                  : "text-yellow-600"
+                }`}>
+                {myClaim.status.toUpperCase()}
+              </span>
+            </p>
+          </div>
         )}
 
       </div>

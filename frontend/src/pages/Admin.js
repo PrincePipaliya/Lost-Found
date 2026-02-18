@@ -19,19 +19,15 @@ export default function Admin() {
       const [itemsRes, usersRes, claimsRes] = await Promise.all([
         api.get("/items"),
         api.get("/users"),
-        api.get("/items/claims/all")
+        api.get("/items/admin/claims") // ✅ FIXED ROUTE
       ]);
 
       setItems(itemsRes.data);
       setUsers(usersRes.data);
       setClaims(claimsRes.data);
     } catch (err) {
-      if (err.response?.status === 401) {
-        localStorage.clear();
-        window.location.href = "/login";
-      } else {
-        toast.error("Failed to load admin data");
-      }
+      console.error("ADMIN LOAD ERROR:", err);
+      toast.error("Failed to load admin data");
     } finally {
       setLoading(false);
     }
@@ -48,7 +44,8 @@ export default function Admin() {
       await api.put(`/items/${id}/approve`);
       toast.success("Item approved");
       loadData();
-    } catch {
+    } catch (err) {
+      console.error("APPROVE ITEM ERROR:", err);
       toast.error("Failed to approve item");
     }
   };
@@ -61,9 +58,7 @@ export default function Admin() {
       toast.success("Item deleted");
       loadData();
     } catch (err) {
-      toast.error(
-        err.response?.data?.message || "Failed to delete item"
-      );
+      toast.error(err.response?.data?.message || "Delete failed");
     }
   };
 
@@ -74,7 +69,8 @@ export default function Admin() {
       await api.put(`/items/${itemId}/claim/${claimIndex}/approve`);
       toast.success("Claim approved");
       loadData();
-    } catch {
+    } catch (err) {
+      console.error("APPROVE CLAIM ERROR:", err);
       toast.error("Failed to approve claim");
     }
   };
@@ -84,7 +80,8 @@ export default function Admin() {
       await api.put(`/items/${itemId}/claim/${claimIndex}/reject`);
       toast.success("Claim rejected");
       loadData();
-    } catch {
+    } catch (err) {
+      console.error("REJECT CLAIM ERROR:", err);
       toast.error("Failed to reject claim");
     }
   };
@@ -101,84 +98,68 @@ export default function Admin() {
       await api.put(`/users/${id}/role`, { role });
       toast.success("Role updated");
       loadData();
-    } catch {
+    } catch (err) {
       toast.error("Failed to update role");
     }
   };
 
   if (loading) {
-    return (
-      <div className="p-6 text-gray-500">
-        Loading admin panel...
-      </div>
-    );
+    return <div className="p-6">Loading admin panel...</div>;
   }
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-12">
-
-      {/* HEADER */}
-      <h1 className="text-4xl font-extrabold animate-fadeInUp">
-        Admin Dashboard
-      </h1>
+      <h1 className="text-4xl font-extrabold">Admin Dashboard</h1>
 
       {/* ================= ITEMS ================= */}
       <section>
         <h2 className="text-2xl font-bold mb-4">Items</h2>
 
-        {items.length === 0 ? (
-          <p className="text-gray-500">No items found.</p>
-        ) : (
-          <div className="space-y-3">
-            {items.map((item, i) => (
-              <div
-                key={item._id}
-                style={{ animationDelay: `${i * 50}ms` }}
-                className="bg-white p-4 rounded-xl shadow
-                  flex justify-between items-center animate-cardFade"
-              >
-                <div>
-                  <h3 className="font-bold">{item.title}</h3>
-                  <p className="text-sm text-gray-500">
-                    {item.type.toUpperCase()} • {item.status.toUpperCase()}
-                  </p>
-                </div>
-
-                <div className="flex gap-2">
-                  {item.status === "pending" && (
-                    <button
-                      onClick={() => approveItem(item._id)}
-                      className="px-3 py-1 bg-green-500 text-white rounded"
-                    >
-                      Approve
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => deleteItem(item._id)}
-                    className="px-3 py-1 bg-red-500 text-white rounded"
-                  >
-                    Delete
-                  </button>
-                </div>
+        <div className="space-y-3">
+          {items.map((item) => (
+            <div
+              key={item._id}
+              className="bg-white p-4 rounded-xl shadow flex justify-between items-center"
+            >
+              <div>
+                <h3 className="font-bold">{item.title}</h3>
+                <p className="text-sm text-gray-500">
+                  {item.type.toUpperCase()} • {item.status.toUpperCase()}
+                </p>
               </div>
-            ))}
-          </div>
-        )}
+
+              <div className="flex gap-2">
+                {item.status === "pending" && (
+                  <button
+                    onClick={() => approveItem(item._id)}
+                    className="px-3 py-1 bg-green-600 text-white rounded"
+                  >
+                    Approve
+                  </button>
+                )}
+
+                <button
+                  onClick={() => deleteItem(item._id)}
+                  className="px-3 py-1 bg-red-600 text-white rounded"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* ================= CLAIMS ================= */}
       <section>
         <h2 className="text-2xl font-bold mb-4">
-          Claim Requests
+          AI Claim Review
         </h2>
 
         {claims.length === 0 ? (
-          <p className="text-gray-500">
-            No claim requests yet.
-          </p>
+          <p className="text-gray-500">No claim requests yet.</p>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {claims.map((item) => (
               <div
                 key={item._id}
@@ -188,48 +169,61 @@ export default function Admin() {
                   {item.title}
                 </h3>
 
-                {item.claims.map((claim, index) => (
-                  <div
-                    key={index}
-                    className="border rounded p-3 mt-3"
-                  >
-                    <p className="font-semibold">
-                      Claimed by: {claim.userId.name}
-                    </p>
+                {item.claims.map((claim, index) => {
+                  const confidenceColor =
+                    claim.confidence >= 80
+                      ? "text-green-600"
+                      : claim.confidence >= 50
+                      ? "text-yellow-600"
+                      : "text-red-600";
 
-                    <ul className="list-disc ml-5 mt-2 text-sm">
-                      {claim.answers.map((ans, i) => (
-                        <li key={i}>{ans}</li>
-                      ))}
-                    </ul>
-
-                    {claim.status === "pending" ? (
-                      <div className="flex gap-2 mt-3">
-                        <button
-                          onClick={() =>
-                            approveClaim(item._id, index)
-                          }
-                          className="bg-green-600 text-white px-3 py-1 rounded"
-                        >
-                          Approve
-                        </button>
-
-                        <button
-                          onClick={() =>
-                            rejectClaim(item._id, index)
-                          }
-                          className="bg-red-600 text-white px-3 py-1 rounded"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    ) : (
-                      <p className="mt-2 text-sm text-gray-500">
-                        Status: {claim.status.toUpperCase()}
+                  return (
+                    <div
+                      key={index}
+                      className="border rounded p-4 mt-4 bg-gray-50"
+                    >
+                      <p className="font-semibold">
+                        {claim.userId?.name} ({claim.userId?.email})
                       </p>
-                    )}
-                  </div>
-                ))}
+
+                      <p className={`font-bold mt-1 ${confidenceColor}`}>
+                        AI Confidence: {claim.confidence || 0}%
+                      </p>
+
+                      <ul className="list-disc ml-5 mt-2 text-sm">
+                        {claim.answers.map((ans, i) => (
+                          <li key={i}>{ans}</li>
+                        ))}
+                      </ul>
+
+                      {claim.status === "pending" ? (
+                        <div className="flex gap-3 mt-3">
+                          <button
+                            onClick={() =>
+                              approveClaim(item._id, index)
+                            }
+                            className="bg-green-600 text-white px-3 py-1 rounded"
+                          >
+                            Approve
+                          </button>
+
+                          <button
+                            onClick={() =>
+                              rejectClaim(item._id, index)
+                            }
+                            className="bg-red-600 text-white px-3 py-1 rounded"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-sm text-gray-500">
+                          Status: {claim.status.toUpperCase()}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ))}
           </div>
@@ -242,58 +236,52 @@ export default function Admin() {
           User Management
         </h2>
 
-        {users.length === 0 ? (
-          <p className="text-gray-500">No users found.</p>
-        ) : (
-          <div className="space-y-3">
-            {users.map((user, i) => (
-              <div
-                key={user._id}
-                style={{ animationDelay: `${i * 50}ms` }}
-                className="bg-white p-4 rounded-xl shadow
-                  flex justify-between items-center animate-cardFade"
-              >
-                <div>
-                  <p className="font-semibold">{user.name}</p>
-                  <p className="text-sm text-gray-500">{user.email}</p>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`px-3 py-1 text-xs font-bold rounded-full
-                      ${
-                        user.role === "admin"
-                          ? "bg-purple-100 text-purple-700"
-                          : "bg-gray-100 text-gray-700"
-                      }`}
-                  >
-                    {user.role.toUpperCase()}
-                  </span>
-
-                  {user.role === "admin" ? (
-                    <button
-                      onClick={() =>
-                        updateRole(user._id, "user", user.email)
-                      }
-                      className="text-red-600 hover:underline text-sm"
-                    >
-                      Demote
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() =>
-                        updateRole(user._id, "admin", user.email)
-                      }
-                      className="text-blue-600 hover:underline text-sm"
-                    >
-                      Promote
-                    </button>
-                  )}
-                </div>
+        <div className="space-y-3">
+          {users.map((user) => (
+            <div
+              key={user._id}
+              className="bg-white p-4 rounded-xl shadow flex justify-between items-center"
+            >
+              <div>
+                <p className="font-semibold">{user.name}</p>
+                <p className="text-sm text-gray-500">{user.email}</p>
               </div>
-            ))}
-          </div>
-        )}
+
+              <div className="flex items-center gap-3">
+                <span
+                  className={`px-3 py-1 text-xs font-bold rounded-full
+                    ${
+                      user.role === "admin"
+                        ? "bg-purple-100 text-purple-700"
+                        : "bg-gray-100 text-gray-700"
+                    }`}
+                >
+                  {user.role.toUpperCase()}
+                </span>
+
+                {user.role === "admin" ? (
+                  <button
+                    onClick={() =>
+                      updateRole(user._id, "user", user.email)
+                    }
+                    className="text-red-600 hover:underline text-sm"
+                  >
+                    Demote
+                  </button>
+                ) : (
+                  <button
+                    onClick={() =>
+                      updateRole(user._id, "admin", user.email)
+                    }
+                    className="text-blue-600 hover:underline text-sm"
+                  >
+                    Promote
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
     </div>
   );

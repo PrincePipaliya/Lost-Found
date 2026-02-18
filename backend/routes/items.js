@@ -8,10 +8,9 @@ const { generateQuestions, scoreClaim } = require("../services/aiService");
 const upload = multer({ dest: "uploads/" });
 
 /* =========================
-   GET CLAIMS (ADMIN)
-   ⚠️ IMPORTANT: Must be ABOVE /:id route
+   ADMIN: VIEW CLAIMS
 ========================= */
-router.get("/claims/all", auth, async (req, res) => {
+router.get("/admin/claims", auth, async (req, res) => {
   try {
     if (req.user.role !== "admin") {
       return res.status(403).json({ message: "Admin access required" });
@@ -19,9 +18,7 @@ router.get("/claims/all", auth, async (req, res) => {
 
     const items = await Item.find({
       "claims.0": { $exists: true }
-    })
-      .populate("claims.userId", "name email")
-      .sort({ "claims.confidence": -1 });
+    }).populate("claims.userId", "name email");
 
     res.json(items);
   } catch (err) {
@@ -31,10 +28,19 @@ router.get("/claims/all", auth, async (req, res) => {
 });
 
 /* =========================
-   CREATE ITEM (USER)
+   CREATE ITEM
+   🔥 LOST → manual questions
+   🔥 FOUND → no questions yet
 ========================= */
 router.post("/", auth, upload.single("image"), async (req, res) => {
   try {
+    let verificationQuestions = [];
+
+    // If LOST → owner must provide questions
+    if (req.body.type === "lost" && req.body.verificationQuestions) {
+      verificationQuestions = JSON.parse(req.body.verificationQuestions);
+    }
+
     const item = await Item.create({
       title: req.body.title,
       description: req.body.description,
@@ -42,7 +48,8 @@ router.post("/", auth, upload.single("image"), async (req, res) => {
       contact: req.body.contact,
       image: req.file ? req.file.path : null,
       userId: new mongoose.Types.ObjectId(req.user.id),
-      status: "pending"
+      status: "pending",
+      verificationQuestions
     });
 
     res.json(item);
@@ -73,8 +80,7 @@ router.get("/mine", auth, async (req, res) => {
 router.get("/", auth, async (req, res) => {
   try {
     if (req.user.role === "admin") {
-      const all = await Item.find().sort({ date: -1 });
-      return res.json(all);
+      return res.json(await Item.find().sort({ date: -1 }));
     }
 
     const approved = await Item.find({
@@ -89,8 +95,8 @@ router.get("/", auth, async (req, res) => {
 });
 
 /* =========================
-   APPROVE ITEM (ADMIN)
-   + AI Question Generation
+   APPROVE ITEM
+   🔥 FOUND → AI generates questions
 ========================= */
 router.put("/:id/approve", auth, async (req, res) => {
   try {
@@ -105,15 +111,17 @@ router.put("/:id/approve", auth, async (req, res) => {
 
     item.status = "approved";
 
-    // Generate AI questions safely
-    if (!item.verificationQuestions || item.verificationQuestions.length === 0) {
+    // If FOUND and no questions → generate AI questions
+    if (
+      item.type === "found" &&
+      (!item.verificationQuestions || item.verificationQuestions.length === 0)
+    ) {
       try {
         const questions = await generateQuestions(item);
 
-        // Save with empty correctAnswer (AI scoring handles logic)
         item.verificationQuestions = questions.map(q => ({
           question: q.question,
-          correctAnswer: "" // hidden
+          correctAnswer: "ai_generated"
         }));
       } catch (aiError) {
         console.error("AI QUESTION ERROR:", aiError.message);
@@ -144,7 +152,6 @@ router.get("/:id", async (req, res) => {
 
     const cleanItem = item.toObject();
 
-    // Remove correct answers from response
     cleanItem.verificationQuestions =
       cleanItem.verificationQuestions?.map(q => ({
         question: q.question
@@ -158,7 +165,7 @@ router.get("/:id", async (req, res) => {
 });
 
 /* =========================
-   SUBMIT CLAIM (AI SCORING)
+   SUBMIT CLAIM
 ========================= */
 router.post("/:id/claim", auth, async (req, res) => {
   try {
@@ -177,6 +184,11 @@ router.post("/:id/claim", auth, async (req, res) => {
       return res.status(400).json({ message: "Item already claimed" });
     }
 
+    // Prevent owner from claiming own item
+    if (item.userId.toString() === req.user.id) {
+      return res.status(400).json({ message: "Owner cannot claim this item" });
+    }
+
     const alreadyClaimed = item.claims.find(
       c => c.userId.toString() === req.user.id
     );
@@ -185,7 +197,6 @@ router.post("/:id/claim", auth, async (req, res) => {
       return res.status(400).json({ message: "You already submitted a claim" });
     }
 
-    // 🤖 AI Confidence Score
     let confidence = 0;
 
     try {
@@ -247,32 +258,6 @@ router.put("/:itemId/claim/:index/approve", auth, async (req, res) => {
 });
 
 /* =========================
-   ADMIN: REJECT CLAIM
-========================= */
-router.put("/:itemId/claim/:index/reject", auth, async (req, res) => {
-  try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ message: "Admin access required" });
-    }
-
-    const item = await Item.findById(req.params.itemId);
-    if (!item) return res.status(404).json({ message: "Item not found" });
-
-    const claim = item.claims[req.params.index];
-    if (!claim) return res.status(404).json({ message: "Claim not found" });
-
-    claim.status = "rejected";
-    await item.save();
-
-    res.json({ message: "Claim rejected successfully" });
-
-  } catch (err) {
-    console.error("REJECT CLAIM ERROR:", err);
-    res.status(500).json({ message: "Failed to reject claim" });
-  }
-});
-
-/* =========================
    DELETE ITEM (ADMIN)
 ========================= */
 router.delete("/:id", auth, async (req, res) => {
@@ -292,20 +277,6 @@ router.delete("/:id", auth, async (req, res) => {
   } catch {
     res.status(500).json({ message: "Failed to delete item" });
   }
-});
-
-/* =========================
-   DELETE OWN ITEM
-========================= */
-router.delete("/:id/own", auth, async (req, res) => {
-  const item = await Item.findById(req.params.id);
-
-  if (!item) return res.status(404).json({ message: "Not found" });
-  if (item.userId.toString() !== req.user.id)
-    return res.status(403).json({ message: "Forbidden" });
-
-  await item.deleteOne();
-  res.json({ message: "Deleted" });
 });
 
 module.exports = router;
