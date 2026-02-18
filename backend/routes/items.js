@@ -29,14 +29,13 @@ router.get("/admin/claims", auth, async (req, res) => {
 
 /* =========================
    CREATE ITEM
-   🔥 LOST → manual questions
-   🔥 FOUND → no questions yet
+   LOST → manual questions
+   FOUND → no questions yet
 ========================= */
 router.post("/", auth, upload.single("image"), async (req, res) => {
   try {
     let verificationQuestions = [];
 
-    // If LOST → owner must provide questions
     if (req.body.type === "lost" && req.body.verificationQuestions) {
       verificationQuestions = JSON.parse(req.body.verificationQuestions);
     }
@@ -75,7 +74,7 @@ router.get("/mine", auth, async (req, res) => {
 });
 
 /* =========================
-   GET ITEMS
+   GET ITEMS (Dashboard)
 ========================= */
 router.get("/", auth, async (req, res) => {
   try {
@@ -95,8 +94,8 @@ router.get("/", auth, async (req, res) => {
 });
 
 /* =========================
-   APPROVE ITEM
-   🔥 FOUND → AI generates questions
+   APPROVE ITEM (ADMIN)
+   FOUND → AI generates questions
 ========================= */
 router.put("/:id/approve", auth, async (req, res) => {
   try {
@@ -111,7 +110,7 @@ router.put("/:id/approve", auth, async (req, res) => {
 
     item.status = "approved";
 
-    // If FOUND and no questions → generate AI questions
+    // If FOUND and no questions → generate AI
     if (
       item.type === "found" &&
       (!item.verificationQuestions || item.verificationQuestions.length === 0)
@@ -140,18 +139,25 @@ router.put("/:id/approve", auth, async (req, res) => {
 
 /* =========================
    PUBLIC ITEM DETAIL
-   (Hide correct answers)
+   Accessible to everyone
 ========================= */
 router.get("/:id", async (req, res) => {
   try {
-    const item = await Item.findById(req.params.id);
+    const item = await Item.findById(req.params.id)
+      .populate("claims.userId", "name email");
 
-    if (!item || item.status !== "approved") {
+    if (!item) {
       return res.status(404).json({ message: "Item not found" });
+    }
+
+    // Only approved items visible publicly
+    if (item.status !== "approved") {
+      return res.status(403).json({ message: "Item not available yet" });
     }
 
     const cleanItem = item.toObject();
 
+    // Hide correct answers
     cleanItem.verificationQuestions =
       cleanItem.verificationQuestions?.map(q => ({
         question: q.question
@@ -159,7 +165,8 @@ router.get("/:id", async (req, res) => {
 
     res.json(cleanItem);
 
-  } catch {
+  } catch (err) {
+    console.error("ITEM DETAIL ERROR:", err);
     res.status(500).json({ message: "Failed to load item" });
   }
 });
@@ -184,7 +191,7 @@ router.post("/:id/claim", auth, async (req, res) => {
       return res.status(400).json({ message: "Item already claimed" });
     }
 
-    // Prevent owner from claiming own item
+    // Prevent owner from claiming
     if (item.userId.toString() === req.user.id) {
       return res.status(400).json({ message: "Owner cannot claim this item" });
     }

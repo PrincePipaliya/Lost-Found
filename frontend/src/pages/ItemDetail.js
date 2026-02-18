@@ -1,7 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
+import { io } from "socket.io-client";
 import api from "../services/api";
 import toast from "react-hot-toast";
+
+const socket = io("http://localhost:5000");
 
 export default function ItemDetail() {
   const { id } = useParams();
@@ -10,10 +13,15 @@ export default function ItemDetail() {
   const [myClaim, setMyClaim] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // 💬 Chat state
+  const [messages, setMessages] = useState([]);
+  const [messageInput, setMessageInput] = useState("");
+
+  const messagesEndRef = useRef(null);
+
   const token = localStorage.getItem("token");
   const isLoggedIn = Boolean(token);
 
-  // 🔐 Decode logged-in user ID safely
   let loggedInUserId = null;
   if (token) {
     try {
@@ -35,7 +43,6 @@ export default function ItemDetail() {
           setAnswers(res.data.verificationQuestions.map(() => ""));
         }
 
-        // 🔎 Detect if user already submitted claim
         if (isLoggedIn && res.data.claims) {
           const existingClaim = res.data.claims.find(
             (c) =>
@@ -58,6 +65,43 @@ export default function ItemDetail() {
 
     loadItem();
   }, [id]);
+
+  /* ================= SOCKET ================= */
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    socket.emit("join_room", id);
+
+    socket.on("receive_message", (data) => {
+      setMessages((prev) => [...prev, data]);
+    });
+
+    return () => {
+      socket.off("receive_message");
+    };
+  }, [id]);
+
+  const sendMessage = () => {
+    if (!messageInput.trim()) return;
+
+    const messageData = {
+      roomId: id,
+      sender: loggedInUserId,
+      text: messageInput,
+      time: new Date().toLocaleTimeString()
+    };
+
+    socket.emit("send_message", messageData);
+    setMessages((prev) => [...prev, messageData]);
+    setMessageInput("");
+  };
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  /* ================= CLAIM SUBMIT ================= */
 
   const submitClaim = async (e) => {
     e.preventDefault();
@@ -101,23 +145,24 @@ export default function ItemDetail() {
     );
   }
 
-  // 🔐 Detect if logged-in user is item owner
   const isOwner =
     loggedInUserId &&
-    item.userId &&
     (typeof item.userId === "string"
       ? item.userId
       : item.userId._id) === loggedInUserId;
 
+  const canChat =
+    isOwner ||
+    (myClaim && myClaim.status === "approved");
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-6">
-      <div className="max-w-4xl mx-auto bg-white p-8 rounded-2xl shadow-lg animate-fadeInUp">
+      <div className="max-w-4xl mx-auto bg-white p-8 rounded-2xl shadow-lg">
 
         <Link to="/dashboard" className="text-blue-600 text-sm">
           ← Back
         </Link>
 
-        {/* IMAGE */}
         {item.image && (
           <img
             src={`http://localhost:5000/${item.image}`}
@@ -126,7 +171,6 @@ export default function ItemDetail() {
           />
         )}
 
-        {/* TITLE */}
         <h1 className="text-3xl font-bold mt-6">
           {item.title}
         </h1>
@@ -135,38 +179,9 @@ export default function ItemDetail() {
           {item.description}
         </p>
 
-        {/* BADGES */}
-        <div className="mt-4 flex gap-3">
-          <span className={`px-3 py-1 rounded-full text-sm font-bold
-            ${item.type === "lost"
-              ? "bg-red-100 text-red-600"
-              : "bg-green-100 text-green-600"
-            }`}>
-            {item.type.toUpperCase()}
-          </span>
-
-          {item.claimed && (
-            <span className="px-3 py-1 rounded-full text-sm font-bold bg-green-100 text-green-700">
-              CLAIMED
-            </span>
-          )}
-        </div>
-
-        {/* CONTACT (only shown if backend allows) */}
-        {item.contact && (
-          <div className="mt-6 border-t pt-4">
-            <p className="text-sm text-gray-500">
-              Contact Information
-            </p>
-            <p className="text-lg font-semibold">
-              {item.contact}
-            </p>
-          </div>
-        )}
-
-        {/* ================= CLAIM FORM ================= */}
+        {/* CLAIM FORM */}
         {isLoggedIn &&
-          !isOwner &&           // ❌ OWNER CANNOT CLAIM
+          !isOwner &&
           !item.claimed &&
           item.verificationQuestions?.length > 0 &&
           !myClaim && (
@@ -195,47 +210,62 @@ export default function ItemDetail() {
                 </div>
               ))}
 
-              <button className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition">
+              <button className="bg-blue-600 text-white px-6 py-2 rounded">
                 Submit Claim
               </button>
             </form>
           )}
 
-        {/* ================= OWNER MESSAGE ================= */}
-        {isOwner && (
-          <div className="mt-8 p-4 bg-blue-50 rounded-lg">
-            <p className="font-semibold text-blue-700">
-              You posted this item.
-            </p>
-          </div>
-        )}
+        {/* ================= CHAT ================= */}
+        {canChat && (
+          <div className="mt-10 border-t pt-6">
+            <h2 className="text-xl font-bold mb-4">
+              💬 Private Chat
+            </h2>
 
-        {/* ================= CLAIM STATUS ================= */}
-        {myClaim && (
-          <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-            <h3 className="font-bold mb-2">
-              Your Claim Status
-            </h3>
+            <div className="h-64 overflow-y-auto border rounded p-4 bg-gray-50">
+              {messages.map((msg, i) => (
+                <div
+                  key={i}
+                  className={`mb-3 ${
+                    msg.sender === loggedInUserId
+                      ? "text-right"
+                      : "text-left"
+                  }`}
+                >
+                  <div
+                    className={`inline-block px-3 py-2 rounded-lg ${
+                      msg.sender === loggedInUserId
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-200"
+                    }`}
+                  >
+                    {msg.text}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    {msg.time}
+                  </div>
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
 
-            <p>
-              AI Confidence:{" "}
-              <span className="font-semibold">
-                {myClaim.confidence}%
-              </span>
-            </p>
-
-            <p className="mt-2">
-              Status:{" "}
-              <span className={`font-semibold
-                ${myClaim.status === "approved"
-                  ? "text-green-600"
-                  : myClaim.status === "rejected"
-                  ? "text-red-600"
-                  : "text-yellow-600"
-                }`}>
-                {myClaim.status.toUpperCase()}
-              </span>
-            </p>
+            <div className="flex gap-2 mt-4">
+              <input
+                value={messageInput}
+                onChange={(e) =>
+                  setMessageInput(e.target.value)
+                }
+                className="flex-1 border rounded px-3 py-2"
+                placeholder="Type a message..."
+              />
+              <button
+                onClick={sendMessage}
+                className="bg-blue-600 text-white px-4 py-2 rounded"
+              >
+                Send
+              </button>
+            </div>
           </div>
         )}
 
