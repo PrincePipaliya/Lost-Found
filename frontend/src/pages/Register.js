@@ -14,29 +14,41 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return;
+
     setLoading(true);
 
     try {
+      const trimmedEmail = email.trim().toLowerCase();
+      const trimmedPassword = password.trim();
+
       // 1️⃣ Register
       await api.post("/auth/register", {
         name: name.trim(),
-        email: email.trim().toLowerCase(),
-        password: password.trim(),
+        email: trimmedEmail,
+        password: trimmedPassword,
       });
 
-      // 2️⃣ Auto-login
+      // 2️⃣ Auto-login (new auth structure)
       const res = await api.post("/auth/login", {
-        email: email.trim().toLowerCase(),
-        password: password.trim(),
+        email: trimmedEmail,
+        password: trimmedPassword,
       });
 
-      // 3️⃣ Save auth
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("role", res.data.user.role);
-      localStorage.setItem("name", res.data.user.name);
+      const { accessToken, refreshToken, user } = res.data;
+
+      // Clear any previous auth
+      localStorage.clear();
+
+      // Store new auth data
+      localStorage.setItem("accessToken", accessToken);
+      localStorage.setItem("refreshToken", refreshToken);
+      localStorage.setItem("user", JSON.stringify(user));
 
       toast.success("Welcome! Your account is ready 🎉");
+
       navigate("/dashboard", { replace: true });
+
     } catch (err) {
       toast.error(
         err.response?.data?.message || "Registration failed"
@@ -49,15 +61,12 @@ export default function Register() {
   return (
     <div className="min-h-screen animated-bg relative flex items-center justify-center overflow-hidden">
 
-      {/* 🌈 Animated Gradient */}
       <div className="absolute inset-0 animate-gradient" />
 
-      {/* 🔮 Floating Blobs */}
       <div className="absolute -top-20 -left-20 w-72 h-72 bg-pink-400 rounded-full blur-3xl opacity-40 animate-blob" />
       <div className="absolute top-1/3 -right-20 w-72 h-72 bg-blue-400 rounded-full blur-3xl opacity-40 animate-blob animation-delay-2000" />
       <div className="absolute bottom-20 left-1/3 w-72 h-72 bg-purple-400 rounded-full blur-3xl opacity-40 animate-blob animation-delay-4000" />
 
-      {/* 🧊 Glass Card */}
       <form
         onSubmit={handleSubmit}
         className="relative z-10 w-full max-w-md
@@ -66,7 +75,6 @@ export default function Register() {
           rounded-2xl shadow-2xl
           p-8 animate-fadeInUp"
       >
-        {/* Logo */}
         <h1 className="text-3xl font-extrabold text-center mb-2 text-white">
           <span className="text-blue-200">we</span>
           <span className="text-white">FOUND</span>
@@ -150,7 +158,6 @@ export default function Register() {
           )}
         </button>
 
-        {/* Login */}
         <p className="mt-6 text-center text-white/80 text-sm">
           Already have an account?{" "}
           <Link to="/login" className="font-semibold underline">

@@ -13,23 +13,34 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (loading) return; // ✅ prevent double submit
+    if (loading) return;
+
     setLoading(true);
 
     try {
       const res = await api.post("/auth/login", {
         email: email.trim().toLowerCase(),
-        password
+        password,
       });
 
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("role", res.data.user.role);
-      localStorage.setItem("name", res.data.user.name);
+      const { accessToken, refreshToken, user } = res.data;
+
+      // Clear old auth data (important)
+      localStorage.clear();
+
+      // Store new tokens
+      localStorage.setItem("accessToken", accessToken);
+      localStorage.setItem("refreshToken", refreshToken);
+      localStorage.setItem("user", JSON.stringify(user));
 
       successToast("Welcome back 👋");
-      navigate("/dashboard");
+
+      navigate("/dashboard", { replace: true });
+
     } catch (err) {
-      errorToast(err.response?.data?.message || "Login failed");
+      errorToast(
+        err.response?.data?.message || "Login failed"
+      );
     } finally {
       setLoading(false);
     }
@@ -38,15 +49,12 @@ export default function Login() {
   return (
     <div className="relative min-h-screen flex items-center justify-center overflow-hidden">
 
-      {/* 🌈 Animated gradient background */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 animate-gradient" />
 
-      {/* 🔮 Floating blobs */}
       <div className="absolute -top-24 -left-24 w-80 h-80 bg-pink-400 rounded-full blur-3xl opacity-40 animate-blob" />
       <div className="absolute top-1/3 -right-24 w-80 h-80 bg-blue-400 rounded-full blur-3xl opacity-40 animate-blob animation-delay-2000" />
       <div className="absolute bottom-24 left-1/3 w-80 h-80 bg-purple-400 rounded-full blur-3xl opacity-40 animate-blob animation-delay-4000" />
 
-      {/* 🧊 Glass login card */}
       <form
         onSubmit={handleSubmit}
         className="relative z-10 w-full max-w-md
@@ -55,7 +63,6 @@ export default function Login() {
           rounded-2xl shadow-2xl
           p-8 animate-fadeInUp"
       >
-        {/* Logo */}
         <h1 className="text-3xl font-extrabold text-center mb-2 text-white">
           <span className="text-blue-200">we</span>
           <span className="text-white">FOUND</span>
@@ -122,10 +129,12 @@ export default function Login() {
           )}
         </button>
 
-        {/* Register */}
         <p className="mt-6 text-center text-white/80 text-sm">
           Don’t have an account?{" "}
-          <Link to="/register" className="font-semibold underline hover:text-white">
+          <Link
+            to="/register"
+            className="font-semibold underline hover:text-white"
+          >
             Register
           </Link>
         </p>

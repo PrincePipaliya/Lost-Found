@@ -1,101 +1,125 @@
 const OpenAI = require("openai");
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
-/* ===============================
-   Generate Verification Questions
-================================= */
-async function generateQuestions(item) {
-  try {
-    const prompt = `
-You are helping verify ownership of a lost or found item.
+/* ======================================================
+   SAFE AI CALL WRAPPER
+====================================================== */
 
-Item details:
+async function safeCompletion(messages, temperature = 0.5) {
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages,
+      temperature,
+      max_tokens: 300,
+    });
+
+    return response.choices?.[0]?.message?.content?.trim() || null;
+  } catch (error) {
+    console.error("AI ERROR:", error.message);
+    return null;
+  }
+}
+
+/* ======================================================
+   GENERATE VERIFICATION QUESTIONS
+====================================================== */
+
+async function generateQuestions(item) {
+  const prompt = `
+You are generating verification questions for ownership validation.
+
+Item Details:
 Title: ${item.title}
 Description: ${item.description}
 Type: ${item.type}
 
-Generate exactly 3 short, specific verification questions 
-that only the real owner would know.
-Do NOT repeat obvious info from the description.
-Return only questions.
-    `;
+Generate EXACTLY 3 short, specific questions.
+Avoid repeating obvious information.
+Return plain text questions only.
+`;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.7
-    });
+  const content = await safeCompletion(
+    [{ role: "user", content: prompt }],
+    0.7
+  );
 
-    const text = response.choices[0].message.content;
-
-    return text
-      .split("\n")
-      .filter(line => line.trim().length > 5)
-      .slice(0, 3)
-      .map(q => ({
-        question: q.replace(/^\d+\.?\s*/, "").trim()
-      }));
-
-  } catch (error) {
-    console.error("AI QUESTION ERROR:", error.message);
-
-    // fallback if AI fails
-    return [
-      { question: "What color is the item?" },
-      { question: "Where was it lost/found?" },
-      { question: "Describe a unique feature." }
-    ];
+  if (!content) {
+    return fallbackQuestions();
   }
+
+  const questions = content
+    .split("\n")
+    .map((q) => q.replace(/^\d+\.?\s*/, "").trim())
+    .filter((q) => q.length > 5)
+    .slice(0, 3)
+    .map((q) => ({
+      question: q,
+    }));
+
+  return questions.length === 3 ? questions : fallbackQuestions();
 }
 
-/* ===============================
-   Score Claim Answers
-================================= */
+/* ======================================================
+   SCORE CLAIM CONFIDENCE
+====================================================== */
+
 async function scoreClaim(item, claimAnswers) {
-  try {
-    const prompt = `
-You are evaluating if a person is the real owner of an item.
+  if (!item.verificationQuestions?.length || !claimAnswers?.length) {
+    return 0;
+  }
+
+  const prompt = `
+Evaluate if the claimant is the true owner.
 
 Item:
 Title: ${item.title}
 Description: ${item.description}
 
 Verification Questions:
-${item.verificationQuestions.map((q, i) =>
-      `${i + 1}. ${q.question}`
-    ).join("\n")}
+${item.verificationQuestions
+    .map((q, i) => `${i + 1}. ${q.question}`)
+    .join("\n")}
 
 User Answers:
-${claimAnswers.map((a, i) =>
-      `${i + 1}. ${a}`
-    ).join("\n")}
+${claimAnswers
+    .map((a, i) => `${i + 1}. ${a}`)
+    .join("\n")}
 
-Score ownership confidence from 0 to 100.
-Return ONLY a number.
-    `;
+Return a confidence score between 0 and 100.
+Return ONLY the number.
+`;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.3
-    });
+  const content = await safeCompletion(
+    [{ role: "user", content: prompt }],
+    0.3
+  );
 
-    const score = parseInt(
-      response.choices[0].message.content.trim()
-    );
+  if (!content) return 0;
 
-    return isNaN(score) ? 0 : score;
+  const score = parseInt(content.replace(/[^\d]/g, ""));
 
-  } catch (error) {
-    console.error("AI SCORING ERROR:", error.message);
-    return 0;
-  }
+  if (isNaN(score)) return 0;
+
+  return Math.max(0, Math.min(score, 100));
+}
+
+/* ======================================================
+   FALLBACK
+====================================================== */
+
+function fallbackQuestions() {
+  return [
+    { question: "What unique feature does the item have?" },
+    { question: "Where was the item last seen?" },
+    { question: "Describe any identifying marks." },
+  ];
 }
 
 module.exports = {
   generateQuestions,
-  scoreClaim
+  scoreClaim,
 };

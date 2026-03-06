@@ -1,26 +1,79 @@
+require("dotenv").config();
+
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const http = require("http");
-const { Server } = require("socket.io");
+const helmet = require("helmet");
+const compression = require("compression");
+const rateLimit = require("express-rate-limit");
+const mongoSanitize = require("express-mongo-sanitize");
+const xss = require("xss-clean");
 const jwt = require("jsonwebtoken");
+const { Server } = require("socket.io");
+
 const Chat = require("./models/Chat");
 const Item = require("./models/Item");
-require("dotenv").config();
 
 const app = express();
 const server = http.createServer(app);
 
-/* ================= SOCKET.IO ================= */
+/* =====================================================
+   SECURITY MIDDLEWARE (Production Grade)
+===================================================== */
+
+app.use(helmet());
+app.use(compression());
+
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL,
+    credentials: true,
+  })
+);
+
+app.use(express.json({ limit: "10kb" }));
+
+app.use(mongoSanitize());
+app.use(xss());
+
+const limiter = rateLimit({
+  max: 100,
+  windowMs: 15 * 60 * 1000,
+  message: "Too many requests. Try again later.",
+});
+
+app.use("/api", limiter);
+
+/* =====================================================
+   STATIC FILES
+===================================================== */
+
+app.use("/uploads", express.static("uploads"));
+
+/* =====================================================
+   DATABASE CONNECTION (Optimized)
+===================================================== */
+
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => console.log("✅ MongoDB Connected"))
+  .catch((err) => {
+    console.error("❌ MongoDB Connection Failed:", err);
+    process.exit(1);
+  });
+
+/* =====================================================
+   SOCKET.IO SETUP (Secure + Scalable)
+===================================================== */
 
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000",
-    methods: ["GET", "POST"]
-  }
+    origin: process.env.FRONTEND_URL,
+    methods: ["GET", "POST"],
+  },
 });
 
-/* 🔐 SOCKET AUTH */
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token;
   if (!token) return next(new Error("Authentication error"));
@@ -34,111 +87,105 @@ io.use((socket, next) => {
   }
 });
 
-/* ================= SOCKET EVENTS ================= */
-
 io.on("connection", (socket) => {
-  console.log("User connected:", socket.user.id);
+  console.log("🔌 User connected:", socket.user.id);
 
   /* JOIN ROOM */
   socket.on("join_room", async (roomId) => {
     try {
       const item = await Item.findById(roomId);
 
-      if (!item || !item.claimed) return;
+      if (!item || item.status !== "matched") return;
 
-      const isOwner = item.userId.toString() === socket.user.id;
+      const isOwner = item.user.toString() === socket.user.id;
 
-      const approvedClaim = item.claims.find(
+      const approvedClaim = item.claims?.find(
         (c) =>
-          c.userId.toString() === socket.user.id &&
+          c.user.toString() === socket.user.id &&
           c.status === "approved"
       );
 
-      // 🚫 Only owner or approved claimer can join
       if (!isOwner && !approvedClaim) return;
 
       socket.join(roomId);
 
-      // ✅ Send chat history
-      const messages = await Chat.find({ itemId: roomId }).sort({ createdAt: 1 });
+      const messages = await Chat.find({ itemId: roomId })
+        .sort({ createdAt: 1 });
 
-      socket.emit("chat_history", messages.map((msg) => ({
-        sender: msg.senderId,
-        text: msg.message,
-        time: new Date(msg.createdAt).toLocaleTimeString()
-      })));
-
+      socket.emit("chat_history", messages);
     } catch (err) {
       console.error("JOIN ROOM ERROR:", err);
     }
   });
 
   /* SEND MESSAGE */
-  socket.on("send_message", async (data) => {
+  socket.on("send_message", async ({ roomId, text }) => {
     try {
-      const item = await Item.findById(data.roomId);
-      if (!item || !item.claimed) return;
+      const item = await Item.findById(roomId);
+      if (!item || item.status !== "matched") return;
 
-      const isOwner = item.userId.toString() === socket.user.id;
+      const isOwner = item.user.toString() === socket.user.id;
 
-      const approvedClaim = item.claims.find(
+      const approvedClaim = item.claims?.find(
         (c) =>
-          c.userId.toString() === socket.user.id &&
+          c.user.toString() === socket.user.id &&
           c.status === "approved"
       );
 
-      // 🚫 Security check
       if (!isOwner && !approvedClaim) return;
 
       const newMessage = await Chat.create({
-        itemId: data.roomId,
+        itemId: roomId,
         senderId: socket.user.id,
-        message: data.text
+        message: text,
       });
 
-      io.to(data.roomId).emit("receive_message", {
-        sender: socket.user.id,
-        text: data.text,
-        time: new Date(newMessage.createdAt).toLocaleTimeString()
-      });
-
+      io.to(roomId).emit("receive_message", newMessage);
     } catch (err) {
-      console.error("CHAT SAVE ERROR:", err);
+      console.error("CHAT ERROR:", err);
     }
   });
 
   socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.user.id);
+    console.log("❌ User disconnected:", socket.user.id);
   });
 });
 
-/* ================= MIDDLEWARE ================= */
-
-app.use(cors());
-app.use(express.json());
-app.use("/uploads", express.static("uploads"));
-
-/* ================= DATABASE ================= */
-
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.error("Mongo error:", err));
-
-mongoose.connection.once("open", () => {
-  console.log("CONNECTED TO DB:", mongoose.connection.name);
-});
-
-/* ================= ROUTES ================= */
+/* =====================================================
+   ROUTES
+===================================================== */
 
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/items", require("./routes/items"));
 app.use("/api/users", require("./routes/users"));
 
-/* ================= SERVER ================= */
+/* =====================================================
+   CENTRAL ERROR HANDLER
+===================================================== */
+
+app.use((err, req, res, next) => {
+  console.error("SERVER ERROR:", err);
+  res.status(500).json({
+    success: false,
+    message: "Internal Server Error",
+  });
+});
+
+/* =====================================================
+   GRACEFUL SHUTDOWN
+===================================================== */
+
+process.on("unhandledRejection", (err) => {
+  console.error("UNHANDLED REJECTION:", err);
+  server.close(() => process.exit(1));
+});
+
+/* =====================================================
+   START SERVER
+===================================================== */
 
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });

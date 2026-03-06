@@ -11,44 +11,74 @@ import ItemDetail from "./pages/ItemDetail";
 import Layout from "./Layout";
 
 /* =====================
+   AUTH HELPERS
+===================== */
+
+const getUser = () => {
+  const user = localStorage.getItem("user");
+  return user ? JSON.parse(user) : null;
+};
+
+const isAuthenticated = () => {
+  return !!localStorage.getItem("accessToken");
+};
+
+/* =====================
    AUTH GUARDS
 ===================== */
 
-/* Logged-in users */
 const PrivateRoute = ({ children }) => {
-  const token = localStorage.getItem("token");
-  return token ? children : <Navigate to="/login" replace />;
+  return isAuthenticated()
+    ? children
+    : <Navigate to="/login" replace />;
 };
 
-/* Admin-only */
 const AdminRoute = ({ children }) => {
-  const token = localStorage.getItem("token");
-  const role = localStorage.getItem("role");
+  const user = getUser();
 
-  if (!token) return <Navigate to="/login" replace />;
-  if (role !== "admin") return <Navigate to="/dashboard" replace />;
+  if (!isAuthenticated())
+    return <Navigate to="/login" replace />;
+
+  if (user?.role !== "admin")
+    return <Navigate to="/dashboard" replace />;
 
   return children;
+};
+
+/* Prevent logged-in users from seeing login/register */
+const PublicRoute = ({ children }) => {
+  return isAuthenticated()
+    ? <Navigate to="/dashboard" replace />
+    : children;
 };
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-
-        {/* 🔹 Layout ALWAYS renders Navbar */}
         <Route element={<Layout />}>
 
           {/* ===== PUBLIC ===== */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+          <Route
+            path="/login"
+            element={
+              <PublicRoute>
+                <Login />
+              </PublicRoute>
+            }
+          />
 
-          {/* ✅ SINGLE PAGE: About + Contact */}
+          <Route
+            path="/register"
+            element={
+              <PublicRoute>
+                <Register />
+              </PublicRoute>
+            }
+          />
+
           <Route path="/about" element={<About />} />
-
           <Route path="/how-it-works" element={<HowItWorks />} />
-
-          {/* Public item detail */}
           <Route path="/items/:id" element={<ItemDetail />} />
 
           {/* ===== USER ===== */}
@@ -81,8 +111,23 @@ export default function App() {
           />
 
           {/* ===== DEFAULT ===== */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route
+            path="/"
+            element={
+              isAuthenticated()
+                ? <Navigate to="/dashboard" replace />
+                : <Navigate to="/login" replace />
+            }
+          />
+
+          <Route
+            path="*"
+            element={
+              isAuthenticated()
+                ? <Navigate to="/dashboard" replace />
+                : <Navigate to="/login" replace />
+            }
+          />
 
         </Route>
       </Routes>

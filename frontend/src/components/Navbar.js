@@ -4,25 +4,28 @@ import { useState } from "react";
 export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
-
   const pathname = location.pathname || "/";
 
-  // 🔐 Auth data
-  const token = localStorage.getItem("token");
-  const role = localStorage.getItem("role");
-  const name = localStorage.getItem("name");
+  /* ======================
+     AUTH STATE (NEW SYSTEM)
+  ====================== */
 
-  // 🚫 Force PUBLIC navbar on auth pages
+  const accessToken = localStorage.getItem("accessToken");
+  const storedUser = localStorage.getItem("user");
+  const user = storedUser ? JSON.parse(storedUser) : null;
+
   const isAuthPage =
     pathname === "/login" || pathname === "/register";
 
-  const isLoggedIn = Boolean(token) && !isAuthPage;
-  const isAdmin = role === "admin";
+  const isLoggedIn = Boolean(accessToken) && !isAuthPage;
+  const isAdmin = user?.role === "admin";
 
   const [open, setOpen] = useState(false);
 
   const logout = () => {
-    localStorage.clear();
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("user");
     setOpen(false);
     navigate("/login", { replace: true });
   };
@@ -59,7 +62,6 @@ export default function Navbar() {
         {/* DESKTOP MENU */}
         <div className="hidden md:flex items-center gap-4">
 
-          {/* ✅ SINGLE INFO PAGE */}
           <DesktopLink to="/about" active={pathname === "/about"}>
             About
           </DesktopLink>
@@ -94,7 +96,7 @@ export default function Navbar() {
               {/* USER INFO */}
               <div className="flex items-center gap-2 ml-3">
                 <span className="font-semibold text-gray-700">
-                  {name || "User"}
+                  {user?.name || "User"}
                 </span>
                 {isAdmin && (
                   <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-purple-100 text-purple-700">
