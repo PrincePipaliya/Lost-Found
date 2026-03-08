@@ -22,13 +22,31 @@ const upload = multer({
 
 router.get("/admin/claims", auth, admin, async (req, res) => {
   try {
+
     const items = await Item.find({
       "claims.0": { $exists: true },
-    }).populate("claims.user", "name email");
+    })
+      .populate("claims.user", "name email")
+      .lean();
 
-    res.json(items);
+    const result = items.map((item) => ({
+      ...item,
+      claims: item.claims.map((c) => ({
+        _id: c._id,
+        answers: c.answers || [],
+        confidence: c.confidence || 0,
+        status: c.status,
+        userId: c.user || null
+      }))
+    }));
+
+    res.json(result);
+
   } catch (err) {
+
+    console.error(err);
     res.status(500).json({ message: "Failed to load claims" });
+
   }
 });
 
@@ -38,30 +56,27 @@ router.get("/admin/claims", auth, admin, async (req, res) => {
 
 router.get("/mine", auth, async (req, res) => {
   try {
+
     const items = await Item.find({ user: req.user.id })
       .sort({ createdAt: -1 });
 
     res.json(items);
+
   } catch (err) {
+
     res.status(500).json({ message: "Failed to load your posts" });
+
   }
 });
 
 /* ======================================================
-   CREATE ITEM (WITH GEO SUPPORT)
+   CREATE ITEM
 ====================================================== */
 
 router.post("/", auth, upload.array("images", 5), async (req, res) => {
   try {
-    const {
-      title,
-      description,
-      type,
-      contact,
-      category,
-      lat,
-      lng,
-    } = req.body;
+
+    const { title, description, type, contact, category, lat, lng } = req.body;
 
     if (!title || !description || !type)
       return res.status(400).json({ message: "Missing required fields" });
@@ -69,6 +84,7 @@ router.post("/", auth, upload.array("images", 5), async (req, res) => {
     let verificationQuestions = [];
 
     if (type === "lost" && req.body.verificationQuestions) {
+
       const parsed = JSON.parse(req.body.verificationQuestions);
 
       verificationQuestions = parsed.map((q) => ({
@@ -76,6 +92,7 @@ router.post("/", auth, upload.array("images", 5), async (req, res) => {
         correctAnswer: q.correctAnswer || "",
         createdByOwner: true,
       }));
+
     }
 
     const item = await Item.create({
@@ -86,8 +103,14 @@ router.post("/", auth, upload.array("images", 5), async (req, res) => {
       contact,
       user: req.user.id,
       status: "pending",
-      images: req.files ? req.files.map((f) => f.path) : [],
+
+      /* IMAGE FIX */
+      images: req.files
+        ? req.files.map((f) => `/uploads/${f.filename}`)
+        : [],
+
       verificationQuestions,
+
       location:
         lat && lng
           ? {
@@ -98,17 +121,22 @@ router.post("/", auth, upload.array("images", 5), async (req, res) => {
     });
 
     res.json(item);
+
   } catch (err) {
+
+    console.error(err);
     res.status(500).json({ message: "Failed to create item" });
+
   }
 });
 
 /* ======================================================
-   GET ITEMS (SEARCH + FILTER)
+   GET APPROVED ITEMS
 ====================================================== */
 
 router.get("/", async (req, res) => {
   try {
+
     const { search, category } = req.query;
 
     let query = { status: "approved" };
@@ -120,8 +148,11 @@ router.get("/", async (req, res) => {
       .sort({ createdAt: -1 });
 
     res.json(items);
+
   } catch (err) {
+
     res.status(500).json({ message: "Failed to load items" });
+
   }
 });
 
@@ -131,6 +162,7 @@ router.get("/", async (req, res) => {
 
 router.get("/search/near", async (req, res) => {
   try {
+
     const { lat, lng, distance = 5000 } = req.query;
 
     const items = await Item.find({
@@ -147,30 +179,52 @@ router.get("/search/near", async (req, res) => {
     });
 
     res.json(items);
+
   } catch (err) {
+
     res.status(500).json({ message: "Geo search failed" });
+
   }
 });
 
 /* ======================================================
-   APPROVE ITEM (ADMIN)
+   ADMIN: GET ALL ITEMS
+====================================================== */
+
+router.get("/admin/all", auth, admin, async (req, res) => {
+  try {
+
+    const items = await Item.find()
+      .sort({ createdAt: -1 });
+
+    res.json(items);
+
+  } catch (err) {
+
+    res.status(500).json({ message: "Failed to load items" });
+
+  }
+});
+
+/* ======================================================
+   APPROVE ITEM
 ====================================================== */
 
 router.put("/:id/approve", auth, admin, async (req, res) => {
   try {
+
     if (!mongoose.Types.ObjectId.isValid(req.params.id))
       return res.status(400).json({ message: "Invalid item ID" });
 
     const item = await Item.findById(req.params.id);
-    if (!item) return res.status(404).json({ message: "Item not found" });
+
+    if (!item)
+      return res.status(404).json({ message: "Item not found" });
 
     item.status = "approved";
 
-    if (
-      item.type === "found" &&
-      (!item.verificationQuestions ||
-        item.verificationQuestions.length === 0)
-    ) {
+    if (item.type === "found" && item.verificationQuestions.length === 0) {
+
       const questions = await generateQuestions(item);
 
       item.verificationQuestions = questions.map((q) => ({
@@ -178,13 +232,45 @@ router.put("/:id/approve", auth, admin, async (req, res) => {
         correctAnswer: "",
         createdByOwner: false,
       }));
+
     }
 
     await item.save();
 
     res.json({ message: "Item approved successfully" });
+
   } catch (err) {
+
+    console.error(err);
     res.status(500).json({ message: "Approval failed" });
+
+  }
+});
+
+/* ======================================================
+   DELETE ITEM
+====================================================== */
+
+router.delete("/:id", auth, admin, async (req, res) => {
+  try {
+
+    if (!mongoose.Types.ObjectId.isValid(req.params.id))
+      return res.status(400).json({ message: "Invalid item ID" });
+
+    const item = await Item.findById(req.params.id);
+
+    if (!item)
+      return res.status(404).json({ message: "Item not found" });
+
+    await Item.findByIdAndDelete(req.params.id);
+
+    res.json({ message: "Item deleted successfully" });
+
+  } catch (err) {
+
+    console.error(err);
+    res.status(500).json({ message: "Delete failed" });
+
   }
 });
 
@@ -194,24 +280,13 @@ router.put("/:id/approve", auth, admin, async (req, res) => {
 
 router.post("/:id/claim", auth, async (req, res) => {
   try {
+
     const { answers } = req.body;
 
-    if (!Array.isArray(answers) || answers.length === 0)
-      return res.status(400).json({ message: "Invalid answers" });
-
     const item = await Item.findById(req.params.id);
+
     if (!item || item.status !== "approved")
       return res.status(404).json({ message: "Item not available" });
-
-    if (item.user.toString() === req.user.id)
-      return res.status(400).json({ message: "Owner cannot claim" });
-
-    const already = item.claims.find(
-      (c) => c.user.toString() === req.user.id
-    );
-
-    if (already)
-      return res.status(400).json({ message: "Already claimed" });
 
     const confidence = await scoreClaim(item, answers);
 
@@ -225,31 +300,61 @@ router.post("/:id/claim", auth, async (req, res) => {
     await item.save();
 
     res.json({ message: "Claim submitted", confidence });
+
   } catch (err) {
+
+    console.error(err);
     res.status(500).json({ message: "Claim failed" });
+
   }
 });
 
 /* ======================================================
-   APPROVE CLAIM (ADMIN)
+   APPROVE CLAIM
 ====================================================== */
 
 router.put("/:itemId/claims/:claimId/approve", auth, admin, async (req, res) => {
   try {
+
     const item = await Item.findById(req.params.itemId);
-    if (!item) return res.status(404).json({ message: "Item not found" });
 
     const claim = item.claims.id(req.params.claimId);
-    if (!claim) return res.status(404).json({ message: "Claim not found" });
 
     claim.status = "approved";
     item.status = "matched";
 
     await item.save();
 
-    res.json({ message: "Claim approved, item matched" });
+    res.json({ message: "Claim approved" });
+
   } catch (err) {
+
     res.status(500).json({ message: "Claim approval failed" });
+
+  }
+});
+
+/* ======================================================
+   REJECT CLAIM
+====================================================== */
+
+router.put("/:itemId/claims/:claimId/reject", auth, admin, async (req, res) => {
+  try {
+
+    const item = await Item.findById(req.params.itemId);
+
+    const claim = item.claims.id(req.params.claimId);
+
+    claim.status = "rejected";
+
+    await item.save();
+
+    res.json({ message: "Claim rejected" });
+
+  } catch (err) {
+
+    res.status(500).json({ message: "Claim rejection failed" });
+
   }
 });
 
@@ -259,25 +364,18 @@ router.put("/:itemId/claims/:claimId/approve", auth, admin, async (req, res) => 
 
 router.get("/:id/chat", auth, async (req, res) => {
   try {
+
     const item = await Item.findById(req.params.id);
-    if (!item) return res.status(404).json({ message: "Item not found" });
-
-    const isOwner = item.user.toString() === req.user.id;
-    const approvedClaim = item.claims.find(
-      (c) =>
-        c.user.toString() === req.user.id &&
-        c.status === "approved"
-    );
-
-    if (!isOwner && !approvedClaim)
-      return res.status(403).json({ message: "Chat not allowed" });
 
     const messages = await Chat.find({ itemId: item._id })
       .sort({ createdAt: 1 });
 
     res.json(messages);
+
   } catch (err) {
+
     res.status(500).json({ message: "Chat load failed" });
+
   }
 });
 
@@ -287,28 +385,33 @@ router.get("/:id/chat", auth, async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   try {
-    const item = await Item.findById(req.params.id)
-      .populate("claims.user", "name email");
 
-    if (!item) return res.status(404).json({ message: "Item not found" });
+    const item = await Item.findById(req.params.id)
+      .populate("claims.user", "name email")
+      .lean();
+
+    if (!item)
+      return res.status(404).json({ message: "Item not found" });
 
     if (item.status === "pending")
       return res.status(403).json({ message: "Not approved yet" });
 
-    const clean = item.toObject();
-
-    clean.verificationQuestions =
-      clean.verificationQuestions?.map((q) => ({
-        question: q.question,
+    item.verificationQuestions =
+      item.verificationQuestions?.map((q) => ({
+        question: q.question
       })) || [];
 
     if (item.status !== "matched") {
-      clean.contact = null;
+      item.contact = null;
     }
 
-    res.json(clean);
+    res.json(item);
+
   } catch (err) {
+
+    console.error(err);
     res.status(500).json({ message: "Failed to load item" });
+
   }
 });
 

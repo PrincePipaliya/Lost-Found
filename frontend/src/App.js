@@ -8,6 +8,7 @@ import MyPosts from "./pages/MyPosts";
 import About from "./pages/About";
 import HowItWorks from "./pages/HowItWorks";
 import ItemDetail from "./pages/ItemDetail";
+import ClaimItem from "./pages/ClaimItem";   // ⭐ NEW
 import Layout from "./Layout";
 
 /* =====================
@@ -15,8 +16,12 @@ import Layout from "./Layout";
 ===================== */
 
 const getUser = () => {
-  const user = localStorage.getItem("user");
-  return user ? JSON.parse(user) : null;
+  try {
+    const user = localStorage.getItem("user");
+    return user ? JSON.parse(user) : null;
+  } catch {
+    return null;
+  }
 };
 
 const isAuthenticated = () => {
@@ -79,7 +84,19 @@ export default function App() {
 
           <Route path="/about" element={<About />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
+
+          {/* Item detail */}
           <Route path="/items/:id" element={<ItemDetail />} />
+
+          {/* ⭐ Claim item page */}
+          <Route
+            path="/claim/:id"
+            element={
+              <PrivateRoute>
+                <ClaimItem />
+              </PrivateRoute>
+            }
+          />
 
           {/* ===== USER ===== */}
           <Route

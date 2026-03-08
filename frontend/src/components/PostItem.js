@@ -3,43 +3,20 @@ import api from "../services/api";
 import toast from "react-hot-toast";
 
 export default function PostItem({ onPosted }) {
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState("lost");
   const [contact, setContact] = useState("");
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [questions, setQuestions] = useState([""]);
-  <h3 className="font-semibold mt-4">Verification Questions</h3>
-
-{questions.map((q, i) => (
-  <input
-    key={i}
-    value={q}
-    onChange={(e) => {
-      const copy = [...questions];
-      copy[i] = e.target.value;
-      setQuestions(copy);
-    }}
-    placeholder={`Question ${i + 1}`}
-    className="border p-2 w-full mb-2"
-  />
-))}
-
-<button
-  type="button"
-  onClick={() => setQuestions([...questions, ""])}
-  className="text-blue-600 text-sm"
->
-  + Add question
-</button>
-
 
   const isValidMobile = (number) => {
     return /^[0-9]{10}$/.test(number);
   };
 
   const submit = async (e) => {
+
     e.preventDefault();
 
     if (!title || !description || !contact) {
@@ -48,24 +25,30 @@ export default function PostItem({ onPosted }) {
     }
 
     if (!isValidMobile(contact)) {
-      toast.error("Enter a valid 10-digit mobile number");
+      toast.error("Enter valid 10 digit mobile number");
       return;
     }
 
     setLoading(true);
 
     const form = new FormData();
+
     form.append("title", title);
     form.append("description", description);
     form.append("type", type);
     form.append("contact", contact);
-    if (image) form.append("image", image);
+
+    /* IMPORTANT FIX */
+    if (image) {
+      form.append("images", image); // must match backend multer
+    }
 
     try {
-      await api.post("/items", form);
-      toast.success("Item submitted for approval 🕒");
 
-      // reset
+      await api.post("/items", form);
+
+      toast.success("Item submitted for approval");
+
       setTitle("");
       setDescription("");
       setContact("");
@@ -73,31 +56,34 @@ export default function PostItem({ onPosted }) {
 
       if (onPosted) onPosted();
 
-      // refresh page after submit
-      setTimeout(() => {
-        window.location.reload();
-      }, 800);
+    } catch (err) {
 
-    } catch {
       toast.error("Failed to submit item");
+
     } finally {
+
       setLoading(false);
+
     }
+
   };
 
   return (
+
     <form
       onSubmit={submit}
-      className="bg-white p-4 rounded shadow mb-6 animate-fadeInUp"
+      className="bg-white p-5 rounded-xl shadow mb-6"
     >
-      <h2 className="font-bold mb-3">Post Lost / Found Item</h2>
+
+      <h2 className="font-bold text-lg mb-3">
+        Post Lost / Found Item
+      </h2>
 
       <input
         className="border p-2 w-full mb-2 rounded"
         placeholder="Title"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        required
       />
 
       <textarea
@@ -105,7 +91,6 @@ export default function PostItem({ onPosted }) {
         placeholder="Description"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        required
       />
 
       <select
@@ -119,33 +104,32 @@ export default function PostItem({ onPosted }) {
 
       <input
         type="file"
-        className="mb-2"
+        className="mb-3"
         onChange={(e) => setImage(e.target.files[0])}
       />
 
-      {/* 📱 MOBILE NUMBER FIELD */}
       <input
         type="tel"
-        inputMode="numeric"
-        pattern="[0-9]{10}"
         maxLength="10"
         className="border p-2 w-full mb-3 rounded"
-        placeholder="Mobile number (10 digits)"
+        placeholder="Mobile number"
         value={contact}
         onChange={(e) =>
           setContact(e.target.value.replace(/\D/g, ""))
         }
-        required
       />
 
       <button
         disabled={loading}
-        className="bg-blue-600 text-white px-4 py-2 rounded
-          hover:bg-blue-700 active:scale-95 transition
-          disabled:opacity-60"
+        className="bg-blue-600 text-white px-4 py-2 rounded"
       >
+
         {loading ? "Submitting..." : "Submit"}
+
       </button>
+
     </form>
+
   );
+
 }
