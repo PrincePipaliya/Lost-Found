@@ -1,116 +1,104 @@
 const mongoose = require("mongoose");
 
-/* CLAIM SUBDOC */
+/* ================= CLAIM SUBSCHEMA ================= */
+
 const ClaimSchema = new mongoose.Schema(
   {
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
-      index: true,
+      required: true
     },
 
-    answers: [String],
-
-    confidence: {
-      type: Number,
-      default: 0,
+    message: {
+      type: String,
+      required: true
     },
 
     status: {
       type: String,
       enum: ["pending", "approved", "rejected"],
-      default: "pending",
-      index: true,
-    },
+      default: "pending"
+    }
+
   },
   { timestamps: true }
 );
 
-/* VERIFICATION */
-const VerificationSchema = new mongoose.Schema(
-  {
-    question: { type: String, required: true },
-    correctAnswer: { type: String, default: "" },
-    createdByOwner: { type: Boolean, default: false },
-  },
-  { _id: false }
-);
+/* ================= ITEM SCHEMA ================= */
 
-/* MAIN ITEM */
 const ItemSchema = new mongoose.Schema(
   {
     title: {
       type: String,
       required: true,
       trim: true,
-      text: true,
+      text: true
     },
 
     description: {
       type: String,
       required: true,
-      text: true,
+      text: true
     },
 
     category: {
       type: String,
-      index: true,
+      index: true
     },
 
     type: {
       type: String,
       enum: ["lost", "found"],
       required: true,
-      index: true,
+      index: true
     },
 
     images: [String],
 
     contact: {
       type: String,
-      required: true,
+      required: true
     },
 
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      index: true,
+      index: true
     },
 
     status: {
       type: String,
-      enum: ["pending", "approved", "matched", "closed"],
+      enum: ["pending", "approved", "matched"],
       default: "pending",
-      index: true,
+      index: true
     },
+
+    /* CLAIMS SYSTEM */
+
+    claims: [ClaimSchema],
+
+    /* LOCATION */
 
     location: {
       type: {
         type: String,
         enum: ["Point"],
-        default: "Point",
+        default: "Point"
       },
       coordinates: {
         type: [Number],
-        index: "2dsphere",
-      },
-    },
+        index: "2dsphere"
+      }
+    }
 
-    verificationQuestions: [VerificationSchema],
-
-    claims: [ClaimSchema],
-
-    aiMatchScore: {
-      type: Number,
-      default: 0,
-    },
   },
   { timestamps: true }
 );
 
-/* INDEXING */
+/* ================= INDEXES ================= */
+
 ItemSchema.index({ title: "text", description: "text" });
 ItemSchema.index({ createdAt: -1 });
 

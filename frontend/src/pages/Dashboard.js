@@ -2,12 +2,16 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../services/api";
 import PostItem from "../components/PostItem";
+import MapView from "../components/MapView";
 import toast from "react-hot-toast";
 
 export default function Dashboard() {
 
   const [items, setItems] = useState([]);
-  const [filter, setFilter] = useState("");
+  const [nearbyItems, setNearbyItems] = useState([]);
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
   const [loading, setLoading] = useState(true);
 
   const user = JSON.parse(localStorage.getItem("user") || "null");
@@ -19,11 +23,16 @@ export default function Dashboard() {
 
       setLoading(true);
 
-      const res = await api.get("/items");
+      const query = new URLSearchParams();
+
+      if (search) query.append("search", search);
+      if (category) query.append("category", category);
+
+      const res = await api.get(`/items?${query.toString()}`);
 
       setItems(res.data);
 
-    } catch (err) {
+    } catch {
 
       toast.error("Failed to load items");
 
@@ -37,112 +46,194 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadItems();
-  }, []);
+  }, [search, category]);
 
-  const filteredItems = filter
-    ? items.filter((i) => i.type === filter)
+  const findNearbyItems = () => {
+
+    if (!navigator.geolocation) {
+      toast.error("Geolocation not supported");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(async (position) => {
+
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+
+      try {
+
+        const res = await api.get(`/items/nearby?lat=${lat}&lng=${lng}`);
+
+        setNearbyItems(res.data);
+
+        toast.success("Nearby items loaded");
+
+      } catch {
+
+        toast.error("Failed to load nearby items");
+
+      }
+
+    });
+
+  };
+
+  const filteredItems = typeFilter
+    ? items.filter((i) => i.type === typeFilter)
     : items;
 
-  const lostCount = items.filter((i) => i.type === "lost").length;
-  const foundCount = items.filter((i) => i.type === "found").length;
+  const getImageUrl = (path) => {
+    if (!path) return null;
+    if (path.startsWith("http")) return path;
+    return `http://localhost:5000${path.startsWith("/") ? "" : "/"}${path}`;
+  };
+
+  const categoryIcons = {
+    electronics: "📱",
+    wallet: "👛",
+    documents: "📄",
+    keys: "🔑",
+    bags: "🎒",
+    clothing: "👕",
+    pets: "🐶",
+    jewelry: "💍",
+    other: "📦"
+  };
+
+  if (loading) {
+
+    return (
+      <div className="p-10 text-center text-lg">
+        Loading dashboard...
+      </div>
+    );
+
+  }
 
   return (
 
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-6">
 
+      {/* HEADER */}
+
       <div className="bg-white rounded-xl shadow p-6 mb-8">
 
         <h1 className="text-3xl font-extrabold">
-          <span className="text-blue-600">we</span>
-          <span className="text-gray-900">FOUND</span>
-          <span className="text-green-600">it</span>
+          weFOUNDit
         </h1>
 
         <p className="text-gray-600 mt-2">
-          Secure AI-powered ownership verification 🔐
+          Community powered Lost & Found system
         </p>
 
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      {/* SEARCH + FILTERS */}
 
-        <StatCard title="Total Items" value={items.length} />
-        <StatCard title="Lost Items" value={lostCount} color="red" />
-        <StatCard title="Found Items" value={foundCount} color="green" />
+      <div className="bg-white p-4 rounded-xl shadow mb-8 flex flex-wrap gap-3">
 
-      </div>
-
-      <div className="mb-8">
-        <PostItem onPosted={loadItems} />
-      </div>
-
-      <div className="flex items-center gap-3 mb-6">
-
-        <span className="font-semibold">Filter:</span>
+        <input
+          type="text"
+          placeholder="Search items..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="border p-2 rounded w-60"
+        />
 
         <select
-          className="border p-2 rounded-lg"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="border p-2 rounded"
+        >
+          <option value="">All Categories</option>
+          <option value="electronics">Electronics</option>
+          <option value="wallet">Wallet</option>
+          <option value="documents">Documents</option>
+          <option value="keys">Keys</option>
+          <option value="bags">Bags</option>
+          <option value="clothing">Clothing</option>
+          <option value="pets">Pets</option>
+          <option value="jewelry">Jewelry</option>
+          <option value="other">Other</option>
+        </select>
+
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          className="border p-2 rounded"
         >
           <option value="">All</option>
           <option value="lost">Lost</option>
           <option value="found">Found</option>
         </select>
 
+        <button
+          onClick={findNearbyItems}
+          className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+        >
+          Nearby Items
+        </button>
+
       </div>
 
-      {loading ? (
+      {/* MAP */}
 
-        <p className="text-center text-gray-500">Loading items...</p>
+      <div className="bg-white rounded-xl shadow p-6 mb-10">
 
-      ) : filteredItems.length === 0 ? (
+        <h2 className="text-2xl font-bold mb-4">
+          Lost & Found Map
+        </h2>
 
-        <p className="text-center text-gray-500 mt-10">
-          No items found
-        </p>
+        <MapView items={items} />
 
-      ) : (
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* POST ITEM */}
 
-          {filteredItems.map((item) => {
+      <div className="mb-8">
+        <PostItem onPosted={loadItems} />
+      </div>
 
-            const isOwner =
-              userId &&
-              (typeof item.user === "string"
-                ? item.user
-                : item.user?._id) === userId;
+      {/* ITEM GRID */}
 
-            return (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-              <div
-                key={item._id}
-                className="bg-white rounded-xl shadow p-4 hover:shadow-xl transition"
-              >
+        {filteredItems.map((item) => {
 
-                {item.images?.length > 0 && (
+          const imageUrl =
+            item.images?.length > 0
+              ? getImageUrl(item.images[0])
+              : null;
 
-                  <img
-                    src={`http://localhost:5000${item.images[0]}`}
-                    alt={item.title}
-                    className="h-40 w-full object-cover rounded-lg mb-3"
-                  />
+          const icon = categoryIcons[item.category] || "📦";
 
-                )}
+          return (
 
-                <h2 className="text-lg font-bold mb-1">
-                  {item.title}
-                </h2>
+            <div
+              key={item._id}
+              className="bg-white rounded-xl shadow hover:shadow-xl transition overflow-hidden"
+            >
 
-                <p className="text-sm text-gray-600 line-clamp-2">
-                  {item.description}
-                </p>
+              {imageUrl && (
 
-                <div className="flex gap-2 mt-3">
+                <img
+                  src={imageUrl}
+                  alt={item.title}
+                  className="h-44 w-full object-cover"
+                />
+
+              )}
+
+              <div className="p-4">
+
+                <div className="flex justify-between items-center mb-2">
+
+                  <span className="text-lg">
+                    {icon}
+                  </span>
 
                   <span
-                    className={`text-xs px-3 py-1 rounded-full font-semibold
+                    className={`text-xs px-2 py-1 rounded-full font-semibold
                     ${item.type === "lost"
                         ? "bg-red-100 text-red-600"
                         : "bg-green-100 text-green-600"
@@ -151,52 +242,40 @@ export default function Dashboard() {
                     {item.type.toUpperCase()}
                   </span>
 
-                  {isOwner && (
-                    <span className="text-xs px-3 py-1 rounded-full font-semibold bg-blue-100 text-blue-700">
-                      YOUR ITEM
-                    </span>
-                  )}
-
                 </div>
+
+                <h2 className="text-lg font-bold">
+                  {item.title}
+                </h2>
+
+                <p className="text-sm text-gray-500 capitalize">
+                  {item.category}
+                </p>
+
+                <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                  {item.description}
+                </p>
+
+                <p className="text-xs text-gray-400 mt-2">
+                  {new Date(item.createdAt).toLocaleDateString()}
+                </p>
 
                 <Link
                   to={`/items/${item._id}`}
-                  className="block mt-4 text-center bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition"
+                  className="block mt-4 text-center bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
                 >
                   View Details
                 </Link>
 
               </div>
 
-            );
+            </div>
 
-          })}
+          );
 
-        </div>
+        })}
 
-      )}
-
-    </div>
-
-  );
-
-}
-
-function StatCard({ title, value, color = "blue" }) {
-
-  const map = {
-    blue: "text-blue-600 bg-blue-50",
-    red: "text-red-600 bg-red-50",
-    green: "text-green-600 bg-green-50"
-  };
-
-  return (
-
-    <div className={`rounded-xl p-5 shadow ${map[color]}`}>
-
-      <p className="text-sm font-medium">{title}</p>
-
-      <p className="text-3xl font-extrabold mt-2">{value}</p>
+      </div>
 
     </div>
 

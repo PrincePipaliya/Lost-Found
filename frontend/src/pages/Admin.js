@@ -1,74 +1,62 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import api from "../services/api";
 import toast from "react-hot-toast";
 
 export default function Admin() {
 
   const [items, setItems] = useState([]);
-  const [claims, setClaims] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  /* ================= LOAD DATA ================= */
+  const [search, setSearch] = useState("");
+  const [filterType, setFilterType] = useState("");
 
-  const loadData = async () => {
+  /* ================= LOAD ITEMS ================= */
+
+  const loadItems = async () => {
+
     try {
 
       setLoading(true);
 
-      const [itemsRes, claimsRes] = await Promise.all([
-        api.get("/items/admin/all"),
-        api.get("/items/admin/claims")
-      ]);
+      const res = await api.get("/items/admin/all");
 
-      setItems(Array.isArray(itemsRes.data) ? itemsRes.data : []);
-      setClaims(Array.isArray(claimsRes.data) ? claimsRes.data : []);
+      setItems(res.data);
 
-    } catch (err) {
+    } catch {
 
-      console.error(err);
-      toast.error("Failed to load admin data");
+      toast.error("Failed to load items");
 
     } finally {
 
       setLoading(false);
 
     }
+
   };
 
   useEffect(() => {
-    loadData();
+    loadItems();
   }, []);
-
-  /* ================= STATS ================= */
-
-  const totalItems = items.length;
-
-  const lostItems = items.filter(i => i.type === "lost").length;
-  const foundItems = items.filter(i => i.type === "found").length;
-
-  const pendingItems = items.filter(i => i.status === "pending").length;
-  const approvedItems = items.filter(i => i.status === "approved").length;
-
-  const totalClaims = claims.reduce(
-    (acc, item) => acc + (item.claims?.length || 0),
-    0
-  );
 
   /* ================= ACTIONS ================= */
 
   const approveItem = async (id) => {
+
     try {
 
       await api.put(`/items/${id}/approve`);
+
       toast.success("Item approved");
 
-      loadData();
+      loadItems();
 
     } catch {
 
       toast.error("Approval failed");
 
     }
+
   };
 
   const deleteItem = async (id) => {
@@ -78,9 +66,10 @@ export default function Admin() {
     try {
 
       await api.delete(`/items/${id}`);
+
       toast.success("Item deleted");
 
-      loadData();
+      loadItems();
 
     } catch {
 
@@ -90,48 +79,41 @@ export default function Admin() {
 
   };
 
-  const approveClaim = async (itemId, claimId) => {
+  /* ================= FILTER ITEMS ================= */
 
-    try {
+  let filteredItems = items;
 
-      await api.put(`/items/${itemId}/claims/${claimId}/approve`);
-      toast.success("Claim approved");
+  if (search) {
 
-      loadData();
+    filteredItems = filteredItems.filter(i =>
+      i.title.toLowerCase().includes(search.toLowerCase())
+    );
 
-    } catch {
+  }
 
-      toast.error("Claim approval failed");
+  if (filterType) {
 
-    }
+    filteredItems = filteredItems.filter(i =>
+      i.type === filterType
+    );
 
-  };
+  }
 
-  const rejectClaim = async (itemId, claimId) => {
+  const pendingItems = filteredItems.filter(i => i.status === "pending");
+  const approvedItems = filteredItems.filter(i => i.status === "approved");
 
-    try {
+  /* ================= STATS ================= */
 
-      await api.put(`/items/${itemId}/claims/${claimId}/reject`);
-      toast.success("Claim rejected");
-
-      loadData();
-
-    } catch {
-
-      toast.error("Claim rejection failed");
-
-    }
-
-  };
+  const totalItems = items.length;
+  const pendingCount = items.filter(i => i.status === "pending").length;
+  const approvedCount = items.filter(i => i.status === "approved").length;
+  const lostCount = items.filter(i => i.type === "lost").length;
+  const foundCount = items.filter(i => i.type === "found").length;
 
   /* ================= LOADING ================= */
 
   if (loading) {
-    return (
-      <div className="p-8 text-lg">
-        Loading dashboard...
-      </div>
-    );
+    return <div className="p-8">Loading admin panel...</div>;
   }
 
   /* ================= UI ================= */
@@ -141,68 +123,64 @@ export default function Admin() {
     <div className="p-6 max-w-7xl mx-auto space-y-10">
 
       <h1 className="text-4xl font-extrabold">
-        Admin Analytics Dashboard
+        Admin Dashboard
       </h1>
 
-      {/* ===== STATS ===== */}
+      {/* ================= STATS ================= */}
 
-      <div className="grid md:grid-cols-4 gap-4">
+      <div className="grid md:grid-cols-5 gap-4">
 
-        <StatCard
-          title="Total Items"
-          value={totalItems}
-        />
+        <StatCard title="Total Items" value={totalItems} />
 
-        <StatCard
-          title="Pending Approval"
-          value={pendingItems}
-        />
+        <StatCard title="Pending Approval" value={pendingCount} />
 
-        <StatCard
-          title="Approved Items"
-          value={approvedItems}
-        />
+        <StatCard title="Approved Items" value={approvedCount} />
 
-        <StatCard
-          title="Total Claims"
-          value={totalClaims}
-        />
+        <StatCard title="Lost Items" value={lostCount} />
+
+        <StatCard title="Found Items" value={foundCount} />
 
       </div>
 
-      {/* ===== LOST VS FOUND ===== */}
+      {/* ================= SEARCH & FILTER ================= */}
 
-      <div className="bg-white p-6 rounded-xl shadow">
+      <div className="flex flex-wrap gap-3 items-center">
 
-        <h2 className="text-xl font-bold mb-4">
-          Lost vs Found Items
-        </h2>
+        <input
+          type="text"
+          placeholder="Search items..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="border p-2 rounded-lg w-64"
+        />
 
-        <div className="flex gap-6 text-lg">
-
-          <div className="text-blue-600 font-semibold">
-            Lost: {lostItems}
-          </div>
-
-          <div className="text-green-600 font-semibold">
-            Found: {foundItems}
-          </div>
-
-        </div>
+        <select
+          value={filterType}
+          onChange={(e) => setFilterType(e.target.value)}
+          className="border p-2 rounded-lg"
+        >
+          <option value="">All Types</option>
+          <option value="lost">Lost</option>
+          <option value="found">Found</option>
+        </select>
 
       </div>
 
-      {/* ===== ITEMS ===== */}
+      {/* ================= PENDING ITEMS ================= */}
 
       <section>
 
         <h2 className="text-2xl font-bold mb-4">
-          Item Moderation
+          Pending Approval
         </h2>
+
+        {pendingItems.length === 0 && (
+          <p className="text-gray-500">No pending items</p>
+        )}
 
         <div className="space-y-3">
 
-          {items.map(item => (
+          {pendingItems.map(item => (
 
             <div
               key={item._id}
@@ -216,30 +194,33 @@ export default function Admin() {
                 </h3>
 
                 <p className="text-sm text-gray-500">
-                  {item.type?.toUpperCase()} • {item.status?.toUpperCase()}
+                  {item.type.toUpperCase()}
                 </p>
 
               </div>
 
               <div className="flex gap-2">
 
-                {item.status === "pending" && (
-
-                  <button
-                    onClick={() => approveItem(item._id)}
-                    className="px-3 py-1 bg-green-600 text-white rounded"
-                  >
-                    Approve
-                  </button>
-
-                )}
+                <button
+                  onClick={() => approveItem(item._id)}
+                  className="bg-green-600 text-white px-3 py-1 rounded"
+                >
+                  Approve
+                </button>
 
                 <button
                   onClick={() => deleteItem(item._id)}
-                  className="px-3 py-1 bg-red-600 text-white rounded"
+                  className="bg-red-600 text-white px-3 py-1 rounded"
                 >
                   Delete
                 </button>
+
+                <Link
+                  to={`/items/${item._id}`}
+                  className="bg-blue-600 text-white px-3 py-1 rounded"
+                >
+                  View
+                </Link>
 
               </div>
 
@@ -251,95 +232,62 @@ export default function Admin() {
 
       </section>
 
-      {/* ===== CLAIM REVIEW ===== */}
+      {/* ================= APPROVED ITEMS ================= */}
 
       <section>
 
         <h2 className="text-2xl font-bold mb-4">
-          AI Claim Review
+          Approved Items
         </h2>
 
-        {claims.map(item => (
+        {approvedItems.length === 0 && (
+          <p className="text-gray-500">No approved items</p>
+        )}
 
-          <div
-            key={item._id}
-            className="bg-white p-4 rounded-xl shadow mb-6"
-          >
+        <div className="space-y-3">
 
-            <h3 className="font-bold text-lg">
-              {item.title}
-            </h3>
+          {approvedItems.map(item => (
 
-            {Array.isArray(item.claims) && item.claims.map(claim => {
+            <div
+              key={item._id}
+              className="bg-white p-4 rounded-xl shadow flex justify-between items-center"
+            >
 
-              const confidence = claim.confidence || 0;
+              <div>
 
-              const color =
-                confidence > 80
-                  ? "text-green-600"
-                  : confidence > 50
-                  ? "text-yellow-600"
-                  : "text-red-600";
+                <h3 className="font-bold text-lg">
+                  {item.title}
+                </h3>
 
-              return (
+                <p className="text-sm text-gray-500">
+                  {item.type.toUpperCase()}
+                </p>
 
-                <div
-                  key={claim._id}
-                  className="border p-4 rounded mt-4 bg-gray-50"
+              </div>
+
+              <div className="flex gap-2">
+
+                <Link
+                  to={`/items/${item._id}`}
+                  className="bg-blue-600 text-white px-3 py-1 rounded"
                 >
+                  View
+                </Link>
 
-                  <p className="font-semibold">
-                    {claim.userId?.name || "Unknown"} ({claim.userId?.email || "No Email"})
-                  </p>
+                <button
+                  onClick={() => deleteItem(item._id)}
+                  className="bg-red-600 text-white px-3 py-1 rounded"
+                >
+                  Delete
+                </button>
 
-                  <p className={`font-bold ${color}`}>
-                    AI Confidence: {confidence}%
-                  </p>
+              </div>
 
-                  <ul className="list-disc ml-6 text-sm mt-2">
+            </div>
 
-                    {Array.isArray(claim.answers) &&
-                      claim.answers.map((a, i) => (
-                        <li key={i}>{String(a)}</li>
-                      ))}
+          ))}
 
-                  </ul>
-
-                  {claim.status === "pending" && (
-
-                    <div className="flex gap-3 mt-3">
-
-                      <button
-                        onClick={() =>
-                          approveClaim(item._id, claim._id)
-                        }
-                        className="bg-green-600 text-white px-3 py-1 rounded"
-                      >
-                        Approve
-                      </button>
-
-                      <button
-                        onClick={() =>
-                          rejectClaim(item._id, claim._id)
-                        }
-                        className="bg-red-600 text-white px-3 py-1 rounded"
-                      >
-                        Reject
-                      </button>
-
-                    </div>
-
-                  )}
-
-                </div>
-
-              );
-
-            })}
-
-          </div>
-
-        ))}
+        </div>
 
       </section>
 
