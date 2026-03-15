@@ -21,10 +21,16 @@ export default function Admin() {
 
       const res = await api.get("/items/admin/all");
 
-      setItems(res.data);
+      const data =
+        Array.isArray(res.data)
+          ? res.data
+          : res.data.items || [];
 
-    } catch {
+      setItems(data);
 
+    } catch (error) {
+
+      console.error("Admin load items error:", error);
       toast.error("Failed to load items");
 
     } finally {
@@ -51,8 +57,9 @@ export default function Admin() {
 
       loadItems();
 
-    } catch {
+    } catch (error) {
 
+      console.error("Approve error:", error);
       toast.error("Approval failed");
 
     }
@@ -65,14 +72,15 @@ export default function Admin() {
 
     try {
 
-      await api.delete(`/items/${id}`);
+      await api.delete(`/items/admin/${id}`);
 
       toast.success("Item deleted");
 
       loadItems();
 
-    } catch {
+    } catch (error) {
 
+      console.error("Delete error:", error);
       toast.error("Delete failed");
 
     }
@@ -81,23 +89,18 @@ export default function Admin() {
 
   /* ================= FILTER ITEMS ================= */
 
-  let filteredItems = items;
+  const filteredItems = items.filter(item => {
 
-  if (search) {
+    const matchSearch =
+      !search ||
+      item.title?.toLowerCase().includes(search.toLowerCase());
 
-    filteredItems = filteredItems.filter(i =>
-      i.title.toLowerCase().includes(search.toLowerCase())
-    );
+    const matchType =
+      !filterType || item.type === filterType;
 
-  }
+    return matchSearch && matchType;
 
-  if (filterType) {
-
-    filteredItems = filteredItems.filter(i =>
-      i.type === filterType
-    );
-
-  }
+  });
 
   const pendingItems = filteredItems.filter(i => i.status === "pending");
   const approvedItems = filteredItems.filter(i => i.status === "approved");
@@ -113,7 +116,11 @@ export default function Admin() {
   /* ================= LOADING ================= */
 
   if (loading) {
-    return <div className="p-8">Loading admin panel...</div>;
+    return (
+      <div className="p-8 text-lg font-semibold">
+        Loading admin panel...
+      </div>
+    );
   }
 
   /* ================= UI ================= */
@@ -126,23 +133,19 @@ export default function Admin() {
         Admin Dashboard
       </h1>
 
-      {/* ================= STATS ================= */}
+      {/* STATS */}
 
       <div className="grid md:grid-cols-5 gap-4">
 
         <StatCard title="Total Items" value={totalItems} />
-
         <StatCard title="Pending Approval" value={pendingCount} />
-
         <StatCard title="Approved Items" value={approvedCount} />
-
         <StatCard title="Lost Items" value={lostCount} />
-
         <StatCard title="Found Items" value={foundCount} />
 
       </div>
 
-      {/* ================= SEARCH & FILTER ================= */}
+      {/* SEARCH */}
 
       <div className="flex flex-wrap gap-3 items-center">
 
@@ -166,7 +169,7 @@ export default function Admin() {
 
       </div>
 
-      {/* ================= PENDING ITEMS ================= */}
+      {/* PENDING */}
 
       <section>
 
@@ -194,7 +197,7 @@ export default function Admin() {
                 </h3>
 
                 <p className="text-sm text-gray-500">
-                  {item.type.toUpperCase()}
+                  {item.type?.toUpperCase()}
                 </p>
 
               </div>
@@ -232,7 +235,7 @@ export default function Admin() {
 
       </section>
 
-      {/* ================= APPROVED ITEMS ================= */}
+      {/* APPROVED */}
 
       <section>
 
@@ -260,7 +263,7 @@ export default function Admin() {
                 </h3>
 
                 <p className="text-sm text-gray-500">
-                  {item.type.toUpperCase()}
+                  {item.type?.toUpperCase()}
                 </p>
 
               </div>

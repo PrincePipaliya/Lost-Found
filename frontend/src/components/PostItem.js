@@ -1,98 +1,76 @@
 import { useState } from "react";
 import api from "../services/api";
 import toast from "react-hot-toast";
-import LocationPicker from "./LocationPicker";
 
 export default function PostItem({ onPosted }) {
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [type, setType] = useState("lost");
-  const [category, setCategory] = useState("");
-  const [contact, setContact] = useState("");
-  const [images, setImages] = useState([]);
-  const [location, setLocation] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [title,setTitle] = useState("");
+  const [description,setDescription] = useState("");
+  const [type,setType] = useState("lost");
+  const [category,setCategory] = useState("");
+  const [contact,setContact] = useState("");
 
-  const isValidMobile = (number) => {
-    return /^[0-9]{10}$/.test(number);
-  };
+  const [images,setImages] = useState([]);
+  const [preview,setPreview] = useState([]);
 
   const handleImageChange = (e) => {
-    setImages(e.target.files);
+
+    const files = Array.from(e.target.files);
+
+    setImages(files);
+
+    const previews = files.map(file =>
+      URL.createObjectURL(file)
+    );
+
+    setPreview(previews);
+
   };
 
-  const submit = async (e) => {
+  const submit = async (e)=>{
 
     e.preventDefault();
 
-    if (!title || !description || !contact || !category) {
-      toast.error("All fields are required");
-      return;
-    }
-
-    if (!isValidMobile(contact)) {
-      toast.error("Enter a valid 10-digit mobile number");
-      return;
-    }
-
-    if (!location) {
-      toast.error("Please select item location on map");
-      return;
-    }
-
-    setLoading(true);
-
     const form = new FormData();
 
-    form.append("title", title);
-    form.append("description", description);
-    form.append("type", type);
-    form.append("category", category);
-    form.append("contact", contact);
+    form.append("title",title);
+    form.append("description",description);
+    form.append("type",type);
+    form.append("category",category);
+    form.append("contact",contact);
 
-    form.append("lat", location.lat);
-    form.append("lng", location.lng);
+    images.forEach(file => {
+      form.append("images",file);
+    });
 
-    if (images.length > 0) {
-      for (let i = 0; i < images.length; i++) {
-        form.append("images", images[i]);
-      }
-    }
+    try{
 
-    try {
+      await api.post("/items",form);
 
-      await api.post("/items", form);
-
-      toast.success("Item submitted for approval 🕒");
+      toast.success("Item posted");
 
       setTitle("");
       setDescription("");
       setCategory("");
       setContact("");
       setImages([]);
-      setLocation(null);
+      setPreview([]);
 
-      if (onPosted) onPosted();
+      if(onPosted) onPosted();
 
-    } catch (err) {
+    }catch{
 
-      console.error(err);
-      toast.error("Failed to submit item");
-
-    } finally {
-
-      setLoading(false);
+      toast.error("Failed to post item");
 
     }
 
   };
 
-  return (
+  return(
 
     <form
       onSubmit={submit}
-      className="bg-white p-6 rounded-xl shadow mb-8 space-y-4"
+      className="bg-white p-6 rounded-xl shadow space-y-4"
     >
 
       <h2 className="font-bold text-lg">
@@ -100,107 +78,73 @@ export default function PostItem({ onPosted }) {
       </h2>
 
       <input
-        className="border p-2 w-full rounded"
         placeholder="Title"
         value={title}
-        onChange={(e) => setTitle(e.target.value)}
+        onChange={e=>setTitle(e.target.value)}
+        className="border p-2 w-full rounded"
         required
       />
 
       <textarea
-        className="border p-2 w-full rounded"
         placeholder="Description"
         value={description}
-        onChange={(e) => setDescription(e.target.value)}
+        onChange={e=>setDescription(e.target.value)}
+        className="border p-2 w-full rounded"
         required
       />
 
       <select
-        className="border p-2 w-full rounded"
         value={type}
-        onChange={(e) => setType(e.target.value)}
+        onChange={e=>setType(e.target.value)}
+        className="border p-2 w-full rounded"
       >
         <option value="lost">Lost</option>
         <option value="found">Found</option>
       </select>
 
-      {/* CATEGORY */}
-
-      <select
-        className="border p-2 w-full rounded"
+      <input
+        placeholder="Category"
         value={category}
-        onChange={(e) => setCategory(e.target.value)}
+        onChange={e=>setCategory(e.target.value)}
+        className="border p-2 w-full rounded"
         required
-      >
-        <option value="">Select Category</option>
-        <option value="electronics">Electronics</option>
-        <option value="wallet">Wallet</option>
-        <option value="documents">Documents</option>
-        <option value="keys">Keys</option>
-        <option value="bags">Bags</option>
-        <option value="clothing">Clothing</option>
-        <option value="pets">Pets</option>
-        <option value="jewelry">Jewelry</option>
-        <option value="other">Other</option>
-      </select>
+      />
+
+      <input
+        placeholder="Contact"
+        value={contact}
+        onChange={e=>setContact(e.target.value)}
+        className="border p-2 w-full rounded"
+        required
+      />
 
       <input
         type="file"
         multiple
         onChange={handleImageChange}
-        className="w-full"
       />
 
-      {images.length > 0 && (
+      {preview.length > 0 && (
 
-        <div className="flex gap-2 flex-wrap">
+        <div className="grid grid-cols-3 gap-3">
 
-          {Array.from(images).map((img, i) => (
-
+          {preview.map((img,index)=>(
             <img
-              key={i}
-              src={URL.createObjectURL(img)}
+              key={index}
+              src={img}
               alt="preview"
-              className="h-20 w-20 object-cover rounded"
+              className="h-24 w-full object-cover rounded"
             />
-
           ))}
 
         </div>
 
       )}
 
-      <input
-        type="tel"
-        inputMode="numeric"
-        pattern="[0-9]{10}"
-        maxLength="10"
-        className="border p-2 w-full rounded"
-        placeholder="Mobile number (10 digits)"
-        value={contact}
-        onChange={(e) =>
-          setContact(e.target.value.replace(/\D/g, ""))
-        }
-        required
-      />
-
-      <div>
-
-        <h3 className="font-semibold mb-2">
-          Select Item Location
-        </h3>
-
-        <LocationPicker
-          onLocationSelect={(loc) => setLocation(loc)}
-        />
-
-      </div>
-
       <button
-        disabled={loading}
-        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition disabled:opacity-60"
+        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
       >
-        {loading ? "Submitting..." : "Submit Item"}
+        Submit Item
       </button>
 
     </form>

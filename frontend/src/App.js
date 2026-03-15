@@ -6,64 +6,69 @@ import Dashboard from "./pages/Dashboard";
 import Admin from "./pages/Admin";
 import MyPosts from "./pages/MyPosts";
 import About from "./pages/About";
-import HowItWorks from "./pages/HowItWorks";
 import ItemDetail from "./pages/ItemDetail";
-import ClaimItem from "./pages/ClaimItem";   // ⭐ NEW
+import ReturnedItems from "./pages/ReturnedItems";
+
 import Layout from "./Layout";
 
-/* =====================
-   AUTH HELPERS
-===================== */
+/* AUTH HELPERS */
 
 const getUser = () => {
   try {
     const user = localStorage.getItem("user");
-    return user ? JSON.parse(user) : null;
+    if (!user) return null;
+    return JSON.parse(user);
   } catch {
     return null;
   }
 };
 
 const isAuthenticated = () => {
-  return !!localStorage.getItem("accessToken");
+  return Boolean(localStorage.getItem("accessToken"));
 };
 
-/* =====================
-   AUTH GUARDS
-===================== */
+/* ROUTE GUARDS */
 
-const PrivateRoute = ({ children }) => {
-  return isAuthenticated()
-    ? children
-    : <Navigate to="/login" replace />;
-};
+function PrivateRoute({ children }) {
+  if (!isAuthenticated()) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+}
 
-const AdminRoute = ({ children }) => {
+function AdminRoute({ children }) {
   const user = getUser();
 
-  if (!isAuthenticated())
+  if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
+  }
 
-  if (user?.role !== "admin")
+  if (!user || user.role !== "admin") {
     return <Navigate to="/dashboard" replace />;
+  }
 
   return children;
-};
+}
 
-/* Prevent logged-in users from seeing login/register */
-const PublicRoute = ({ children }) => {
-  return isAuthenticated()
-    ? <Navigate to="/dashboard" replace />
-    : children;
-};
+function PublicRoute({ children }) {
+  if (isAuthenticated()) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return children;
+}
+
+/* APP */
 
 export default function App() {
+
   return (
+
     <BrowserRouter>
+
       <Routes>
+
         <Route element={<Layout />}>
 
-          {/* ===== PUBLIC ===== */}
           <Route
             path="/login"
             element={
@@ -83,22 +88,11 @@ export default function App() {
           />
 
           <Route path="/about" element={<About />} />
-          <Route path="/how-it-works" element={<HowItWorks />} />
 
-          {/* Item detail */}
+          <Route path="/returned" element={<ReturnedItems />} />
+
           <Route path="/items/:id" element={<ItemDetail />} />
 
-          {/* ⭐ Claim item page */}
-          <Route
-            path="/claim/:id"
-            element={
-              <PrivateRoute>
-                <ClaimItem />
-              </PrivateRoute>
-            }
-          />
-
-          {/* ===== USER ===== */}
           <Route
             path="/dashboard"
             element={
@@ -117,7 +111,6 @@ export default function App() {
             }
           />
 
-          {/* ===== ADMIN ===== */}
           <Route
             path="/admin"
             element={
@@ -127,7 +120,6 @@ export default function App() {
             }
           />
 
-          {/* ===== DEFAULT ===== */}
           <Route
             path="/"
             element={
@@ -137,17 +129,12 @@ export default function App() {
             }
           />
 
-          <Route
-            path="*"
-            element={
-              isAuthenticated()
-                ? <Navigate to="/dashboard" replace />
-                : <Navigate to="/login" replace />
-            }
-          />
-
         </Route>
+
       </Routes>
+
     </BrowserRouter>
+
   );
+
 }

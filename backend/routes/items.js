@@ -1,16 +1,14 @@
 const router = require("express").Router();
 const multer = require("multer");
-const mongoose = require("mongoose");
 const path = require("path");
-
-const Item = require("../models/Item");
 
 const auth = require("../middleware/auth");
 const admin = require("../middleware/admin");
 
-/* ======================================================
-   MULTER STORAGE
-====================================================== */
+const controller = require("../controllers/itemController");
+const Item = require("../models/Item");
+
+/* MULTER STORAGE */
 
 const storage = multer.diskStorage({
 
@@ -26,200 +24,77 @@ const storage = multer.diskStorage({
       Date.now() + "-" + Math.round(Math.random() * 1E9) + ext;
 
     cb(null, uniqueName);
-  }
-
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }
-});
-
-/* ======================================================
-   CREATE ITEM
-====================================================== */
-
-router.post("/", auth, upload.array("images", 5), async (req, res) => {
-
-  try {
-
-    const { title, description, type, contact, category, lat, lng } = req.body;
-
-    const item = await Item.create({
-
-      title,
-      description,
-      type,
-      category,
-      contact,
-      user: req.user.id,
-      status: "pending",
-      claims: [],
-
-      images: req.files ? req.files.map(f => `/uploads/${f.filename}`) : [],
-
-      location:
-        lat && lng
-          ? {
-              type: "Point",
-              coordinates: [parseFloat(lng), parseFloat(lat)]
-            }
-          : undefined
-
-    });
-
-    res.json(item);
-
-  } catch (err) {
-
-    console.error(err);
-    res.status(500).json({ message: "Failed to create item" });
 
   }
 
 });
 
-/* ======================================================
-   GET ITEMS
-====================================================== */
+const upload = multer({ storage });
 
-router.get("/", async (req, res) => {
+/* ROUTES */
+
+router.post("/", auth, upload.array("images", 5), controller.createItem);
+
+router.get("/admin/all", auth, admin, controller.getAllAdminItems);
+
+router.put("/:id/approve", auth, admin, controller.approveItem);
+
+router.get("/mine/list", auth, controller.getMyPosts);
+
+/* RETURNED ITEMS PAGE */
+
+router.get("/returned/all", async (req, res) => {
 
   try {
 
-    const { search, category } = req.query;
-
-    let query = { status: "approved" };
-
-    if (category) query.category = category;
-
-    if (search) {
-
-      query.$or = [
-        { title: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } }
-      ];
-
-    }
-
-    const items = await Item.find(query).sort({ createdAt: -1 });
+    const items = await Item.find({ status: "returned" })
+      .populate("user", "name")
+      .sort({ updatedAt: -1 });
 
     res.json(items);
 
   } catch {
 
-    res.status(500).json({ message: "Failed to load items" });
+    res.status(500).json({ message: "Failed to load returned items" });
 
   }
 
 });
 
-/* ======================================================
-   CLAIM ITEM
-====================================================== */
+router.get("/", controller.getApprovedItems);
 
-router.post("/:id/claim", auth, async (req, res) => {
+router.get("/:id", controller.getItem);
 
-  try {
+/* MARK ITEM RETURNED */
 
-    const { message } = req.body;
-
-    const item = await Item.findById(req.params.id);
-
-    if (!item) return res.status(404).json({ message: "Item not found" });
-
-    item.claims.push({
-      user: req.user.id,
-      message,
-      status: "pending"
-    });
-
-    await item.save();
-
-    res.json({ message: "Claim submitted" });
-
-  } catch {
-
-    res.status(500).json({ message: "Claim failed" });
-
-  }
-
-});
-
-/* ======================================================
-   ADMIN CLAIM APPROVE
-====================================================== */
-
-router.put("/:id/claims/:claimId/approve", auth, admin, async (req, res) => {
+router.put("/:id/returned", auth, async (req, res) => {
 
   try {
 
     const item = await Item.findById(req.params.id);
 
-    const claim = item.claims.id(req.params.claimId);
+    if (!item)
+      return res.status(404).json({ message: "Item not found" });
 
-    claim.status = "approved";
+    if (item.user.toString() !== req.user.id)
+      return res.status(403).json({ message: "Not authorized" });
 
-    item.status = "matched";
-
-    await item.save();
-
-    res.json({ message: "Claim approved" });
-
-  } catch {
-
-    res.status(500).json({ message: "Approval failed" });
-
-  }
-
-});
-
-/* ======================================================
-   ADMIN CLAIM REJECT
-====================================================== */
-
-router.put("/:id/claims/:claimId/reject", auth, admin, async (req, res) => {
-
-  try {
-
-    const item = await Item.findById(req.params.id);
-
-    const claim = item.claims.id(req.params.claimId);
-
-    claim.status = "rejected";
+    item.status = "returned";
 
     await item.save();
 
-    res.json({ message: "Claim rejected" });
+    res.json({ message: "Item marked as returned" });
 
   } catch {
 
-    res.status(500).json({ message: "Rejection failed" });
+    res.status(500).json({ message: "Failed to update item" });
 
   }
 
 });
 
-/* ======================================================
-   ITEM DETAIL
-====================================================== */
+router.delete("/admin/:id", auth, admin, controller.adminDeleteItem);
 
-router.get("/:id", async (req, res) => {
-
-  try {
-
-    const item = await Item.findById(req.params.id).lean();
-
-    if (!item) return res.status(404).json({ message: "Item not found" });
-
-    res.json(item);
-
-  } catch {
-
-    res.status(500).json({ message: "Failed to load item" });
-
-  }
-
-});
+router.delete("/:id", auth, controller.deleteOwnPost);
 
 module.exports = router;

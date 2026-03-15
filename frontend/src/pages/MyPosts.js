@@ -1,101 +1,208 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import api from "../services/api";
 import toast from "react-hot-toast";
 
 export default function MyPosts() {
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const loadMyPosts = async () => {
+  const getImageUrl = (path) => {
+    if (!path) return null;
+    return `http://localhost:5000${path}`;
+  };
+
+  /* LOAD POSTS */
+
+  const loadPosts = async () => {
+
     try {
+
       setLoading(true);
-      const res = await api.get("/items/mine"); // ✅ USER'S OWN POSTS
-      setItems(res.data);
-    } catch (err) {
-      if (err.response?.status === 401) {
-        localStorage.clear();
-        window.location.href = "/login";
-      } else {
-        toast.error("Failed to load your posts");
-      }
+
+      const res = await api.get("/items/mine/list");
+
+      const data =
+        Array.isArray(res.data)
+          ? res.data
+          : res.data.items || [];
+
+      setItems(data);
+
+    } catch (error) {
+
+      console.error(error);
+      toast.error("Failed to load posts");
+
     } finally {
+
       setLoading(false);
+
     }
+
   };
 
   useEffect(() => {
-    loadMyPosts();
+    loadPosts();
   }, []);
 
-  const deletePost = async (id) => {
-    if (!window.confirm("Delete this post?")) return;
+  /* MARK RETURNED */
+
+  const markReturned = async (id) => {
+
+    if (!window.confirm("Mark this item as returned to owner?")) return;
 
     try {
-      await api.delete(`/items/${id}/own`);
-      toast.success("Post deleted");
-      loadMyPosts();
-    } catch {
-      toast.error("Delete failed");
+
+      await api.put(`/items/${id}/returned`);
+
+      toast.success("Item marked as returned");
+
+      loadPosts();
+
+    } catch (error) {
+
+      console.error(error);
+      toast.error("Update failed");
+
     }
+
   };
 
+  /* DELETE POST */
+
+  const deletePost = async (id) => {
+
+    if (!window.confirm("Delete this post permanently?")) return;
+
+    try {
+
+      await api.delete(`/items/${id}`);
+
+      toast.success("Post deleted");
+
+      loadPosts();
+
+    } catch (error) {
+
+      console.error(error);
+      toast.error("Delete failed");
+
+    }
+
+  };
+
+  if (loading) {
+
+    return (
+      <div className="p-10 text-center text-lg font-semibold">
+        Loading your posts...
+      </div>
+    );
+
+  }
+
   return (
-    <div className="p-6 max-w-5xl mx-auto min-h-screen">
-      <h1 className="text-3xl font-bold mb-6 animate-fadeInUp">
+
+    <div className="p-6 max-w-6xl mx-auto">
+
+      <h1 className="text-3xl font-bold mb-6">
         My Posts
       </h1>
 
-      {loading ? (
-        <p className="text-gray-500">Loading your posts...</p>
-      ) : items.length === 0 ? (
-        <p className="text-gray-500">
-          You haven’t posted anything yet.
-        </p>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {items.map((item, i) => (
+      {items.length === 0 && (
+
+        <div className="text-center text-gray-500 mt-10">
+          You haven't posted any items yet.
+        </div>
+
+      )}
+
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+        {items.map(item => {
+
+          const image =
+            item.images?.length > 0
+              ? getImageUrl(item.images[0])
+              : null;
+
+          return (
+
             <div
               key={item._id}
-              style={{ animationDelay: `${i * 60}ms` }}
-              className="border rounded-xl p-4 bg-white shadow
-                hover:shadow-lg transition animate-cardFade"
+              className="bg-white rounded-xl shadow hover:shadow-lg transition p-4"
             >
-              {/* PUBLIC ITEM DETAIL LINK */}
-              <Link
-                to={`/items/${item._id}`}
-                className="font-bold text-lg text-blue-600 hover:underline"
-              >
-                {item.title}
-              </Link>
 
-              <p className="text-sm text-gray-600 mt-1">
+              {image && (
+
+                <img
+                  src={image}
+                  alt={item.title}
+                  className="h-40 w-full object-cover rounded mb-3"
+                />
+
+              )}
+
+              <h2 className="font-bold text-lg">
+                {item.title}
+              </h2>
+
+              <p className="text-sm text-gray-500">
+                {item.category}
+              </p>
+
+              <p className="text-sm mt-2 text-gray-700">
                 {item.description}
               </p>
 
-              <div className="flex justify-between items-center mt-4">
+              <div className="flex items-center justify-between mt-4">
+
                 <span
-                  className={`text-xs font-bold px-3 py-1 rounded-full
-                    ${
-                      item.status === "approved"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-yellow-100 text-yellow-700"
-                    }`}
+                  className={`text-xs px-2 py-1 rounded
+                  ${
+                    item.status === "approved"
+                      ? "bg-green-100 text-green-700"
+                      : item.status === "returned"
+                      ? "bg-blue-100 text-blue-700"
+                      : "bg-yellow-100 text-yellow-700"
+                  }`}
                 >
-                  {item.status.toUpperCase()}
+                  {item.status?.toUpperCase()}
                 </span>
 
-                <button
-                  onClick={() => deletePost(item._id)}
-                  className="text-red-600 hover:underline text-sm"
-                >
-                  Delete
-                </button>
+                <div>
+
+                  {item.status !== "returned" && (
+                    <button
+                      onClick={() => markReturned(item._id)}
+                      className="text-green-600 text-sm hover:underline mr-4"
+                    >
+                      Mark Returned
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => deletePost(item._id)}
+                    className="text-red-600 text-sm hover:underline"
+                  >
+                    Delete
+                  </button>
+
+                </div>
+
               </div>
+
             </div>
-          ))}
-        </div>
-      )}
+
+          );
+
+        })}
+
+      </div>
+
     </div>
+
   );
+
 }
