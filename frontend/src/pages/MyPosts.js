@@ -12,8 +12,6 @@ export default function MyPosts() {
     return `http://localhost:5000${path}`;
   };
 
-  /* LOAD POSTS */
-
   const loadPosts = async () => {
 
     try {
@@ -92,6 +90,12 @@ export default function MyPosts() {
 
   };
 
+  /* STATS */
+
+  const total = items.length;
+  const returned = items.filter(i => i.status === "returned").length;
+  const active = items.filter(i => i.status !== "returned").length;
+
   if (loading) {
 
     return (
@@ -106,17 +110,36 @@ export default function MyPosts() {
 
     <div className="p-6 max-w-6xl mx-auto">
 
+      {/* HEADER */}
+
       <h1 className="text-3xl font-bold mb-6">
         My Posts
       </h1>
 
+
+      {/* STATS */}
+
+      <div className="grid md:grid-cols-3 gap-4 mb-8">
+
+        <StatCard title="Total Posts" value={total} />
+        <StatCard title="Active Items" value={active} />
+        <StatCard title="Returned Items" value={returned} />
+
+      </div>
+
+
+      {/* EMPTY STATE */}
+
       {items.length === 0 && (
 
-        <div className="text-center text-gray-500 mt-10">
+        <div className="bg-white shadow rounded-xl p-10 text-center text-gray-500">
           You haven't posted any items yet.
         </div>
 
       )}
+
+
+      {/* POSTS GRID */}
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
 
@@ -131,7 +154,7 @@ export default function MyPosts() {
 
             <div
               key={item._id}
-              className="bg-white rounded-xl shadow hover:shadow-lg transition p-4"
+              className="bg-white rounded-xl shadow hover:shadow-xl hover:-translate-y-1 transition overflow-hidden"
             >
 
               {image && (
@@ -139,55 +162,91 @@ export default function MyPosts() {
                 <img
                   src={image}
                   alt={item.title}
-                  className="h-40 w-full object-cover rounded mb-3"
+                  className="h-44 w-full object-cover"
                 />
 
               )}
 
-              <h2 className="font-bold text-lg">
-                {item.title}
-              </h2>
+              <div className="p-4">
 
-              <p className="text-sm text-gray-500">
-                {item.category}
-              </p>
+                {/* TYPE BADGE */}
 
-              <p className="text-sm mt-2 text-gray-700">
-                {item.description}
-              </p>
+                <div className="flex justify-between items-center mb-2">
 
-              <div className="flex items-center justify-between mt-4">
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full font-semibold
+                    ${
+                      item.type === "lost"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-green-100 text-green-700"
+                    }`}
+                  >
+                    {item.type?.toUpperCase()}
+                  </span>
 
-                <span
-                  className={`text-xs px-2 py-1 rounded
-                  ${
-                    item.status === "approved"
-                      ? "bg-green-100 text-green-700"
-                      : item.status === "returned"
-                      ? "bg-blue-100 text-blue-700"
-                      : "bg-yellow-100 text-yellow-700"
-                  }`}
-                >
-                  {item.status?.toUpperCase()}
-                </span>
+                  {item.category && (
 
-                <div>
+                    <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+                      {item.category}
+                    </span>
 
-                  {item.status !== "returned" && (
-                    <button
-                      onClick={() => markReturned(item._id)}
-                      className="text-green-600 text-sm hover:underline mr-4"
-                    >
-                      Mark Returned
-                    </button>
                   )}
 
-                  <button
-                    onClick={() => deletePost(item._id)}
-                    className="text-red-600 text-sm hover:underline"
+                </div>
+
+
+                {/* TITLE */}
+
+                <h2 className="font-bold text-lg">
+                  {item.title}
+                </h2>
+
+                <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                  {item.description}
+                </p>
+
+
+                {/* STATUS */}
+
+                <div className="flex items-center justify-between mt-4">
+
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full
+                    ${
+                      item.status === "approved"
+                        ? "bg-green-100 text-green-700"
+                        : item.status === "returned"
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-yellow-100 text-yellow-700"
+                    }`}
                   >
-                    Delete
-                  </button>
+                    {item.status?.toUpperCase()}
+                  </span>
+
+
+                  {/* ACTIONS */}
+
+                  <div className="flex gap-2">
+
+                    {item.status !== "returned" && (
+
+                      <button
+                        onClick={() => markReturned(item._id)}
+                        className="text-xs bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
+                      >
+                        Returned
+                      </button>
+
+                    )}
+
+                    <button
+                      onClick={() => deletePost(item._id)}
+                      className="text-xs bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+                    >
+                      Delete
+                    </button>
+
+                  </div>
 
                 </div>
 
@@ -200,6 +259,29 @@ export default function MyPosts() {
         })}
 
       </div>
+
+    </div>
+
+  );
+
+}
+
+
+/* STAT CARD */
+
+function StatCard({ title, value }) {
+
+  return (
+
+    <div className="bg-white p-5 rounded-xl shadow text-center">
+
+      <p className="text-gray-500 text-sm">
+        {title}
+      </p>
+
+      <p className="text-3xl font-bold mt-1">
+        {value}
+      </p>
 
     </div>
 

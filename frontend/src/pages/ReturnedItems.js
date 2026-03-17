@@ -52,19 +52,57 @@ export default function ReturnedItems() {
 
   }
 
+  const totalReturned = items.length;
+
   return (
 
     <div className="p-6 max-w-6xl mx-auto">
 
-      <h1 className="text-3xl font-bold mb-6">
+      {/* HEADER */}
+
+      <h1 className="text-3xl font-bold mb-2">
         Returned Items
       </h1>
 
+      <p className="text-gray-500 mb-6">
+        Items successfully returned to their owners.
+      </p>
+
+
+      {/* STATS */}
+
+      <div className="grid md:grid-cols-3 gap-4 mb-8">
+
+        <StatCard
+          title="Total Returned"
+          value={totalReturned}
+        />
+
+        <StatCard
+          title="Success Rate"
+          value={`${totalReturned}`}
+        />
+
+        <StatCard
+          title="Recovered Items"
+          value={totalReturned}
+        />
+
+      </div>
+
+
+      {/* EMPTY STATE */}
+
       {items.length === 0 && (
-        <p className="text-gray-500 text-center">
+
+        <div className="bg-white shadow rounded-xl p-10 text-center text-gray-500">
           No returned items yet.
-        </p>
+        </div>
+
       )}
+
+
+      {/* ITEMS GRID */}
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
 
@@ -79,7 +117,7 @@ export default function ReturnedItems() {
 
             <div
               key={item._id}
-              className="bg-white rounded-xl shadow p-4"
+              className="bg-white rounded-xl shadow hover:shadow-xl hover:-translate-y-1 transition overflow-hidden"
             >
 
               {image && (
@@ -87,28 +125,44 @@ export default function ReturnedItems() {
                 <img
                   src={image}
                   alt={item.title}
-                  className="h-40 w-full object-cover rounded mb-3"
+                  className="h-44 w-full object-cover"
                 />
 
               )}
 
-              <h2 className="font-bold text-lg">
-                {item.title}
-              </h2>
+              <div className="p-4">
 
-              <p className="text-sm text-gray-500">
-                {item.category}
-              </p>
+                <div className="flex justify-between items-center mb-2">
 
-              <p className="text-sm mt-2">
-                {item.description}
-              </p>
+                  <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-semibold">
+                    SUCCESS
+                  </span>
 
-              <div className="mt-4">
+                  {item.category && (
 
-                <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">
-                  RETURNED
-                </span>
+                    <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+                      {item.category}
+                    </span>
+
+                  )}
+
+                </div>
+
+                <h2 className="font-bold text-lg">
+                  {item.title}
+                </h2>
+
+                <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                  {item.description}
+                </p>
+
+                <div className="mt-4">
+
+                  <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full">
+                    RETURNED
+                  </span>
+
+                </div>
 
               </div>
 
@@ -119,6 +173,29 @@ export default function ReturnedItems() {
         })}
 
       </div>
+
+    </div>
+
+  );
+
+}
+
+
+/* STAT CARD */
+
+function StatCard({ title, value }) {
+
+  return (
+
+    <div className="bg-white p-5 rounded-xl shadow text-center">
+
+      <p className="text-gray-500 text-sm">
+        {title}
+      </p>
+
+      <p className="text-3xl font-bold mt-1">
+        {value}
+      </p>
 
     </div>
 

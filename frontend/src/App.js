@@ -120,13 +120,11 @@ export default function App() {
             }
           />
 
+          {/* DEFAULT ROUTE ALWAYS GOES TO LOGIN */}
+
           <Route
             path="/"
-            element={
-              isAuthenticated()
-                ? <Navigate to="/dashboard" replace />
-                : <Navigate to="/login" replace />
-            }
+            element={<Navigate to="/login" replace />}
           />
 
         </Route>
