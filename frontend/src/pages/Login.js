@@ -4,6 +4,8 @@ import api from "../services/api";
 import toast from "react-hot-toast";
 import { Mail, Lock, Loader2, Eye, EyeOff } from "lucide-react";
 
+import { useAuth } from "../context/AuthContext";
+
 import Particles from "@tsparticles/react";
 import { loadSlim } from "tsparticles-slim";
 import Tilt from "react-parallax-tilt";
@@ -12,6 +14,8 @@ export default function Login() {
 
   const navigate = useNavigate();
   const emailRef = useRef(null);
+
+  const { login } = useAuth();
 
   const [email,setEmail] = useState("");
   const [password,setPassword] = useState("");
@@ -52,10 +56,8 @@ export default function Login() {
 
       const { accessToken, refreshToken, user } = res.data;
 
-      localStorage.clear();
-      localStorage.setItem("accessToken",accessToken);
-      localStorage.setItem("refreshToken",refreshToken);
-      localStorage.setItem("user",JSON.stringify(user));
+      // ✅ USE CONTEXT (IMPORTANT FIX)
+      login({ accessToken, refreshToken, user });
 
       toast.success("Welcome back 👋");
       navigate("/dashboard",{replace:true});

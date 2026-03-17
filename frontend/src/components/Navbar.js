@@ -11,40 +11,29 @@ import {
   Shield
 } from "lucide-react";
 
+import { useAuth } from "../context/AuthContext";
+
 export default function Navbar() {
 
   const navigate = useNavigate();
   const location = useLocation();
   const pathname = location.pathname;
 
-  const accessToken = localStorage.getItem("accessToken");
-  const storedUser = localStorage.getItem("user");
-  const user = storedUser ? JSON.parse(storedUser) : null;
-
-  const isLoggedIn = Boolean(accessToken);
+  const { isLoggedIn, user, logout } = useAuth();
   const isAdmin = user?.role === "admin";
 
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  const logout = () => {
-
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("user");
-
+  const handleLogout = () => {
+    logout();
     navigate("/login", { replace: true });
-
   };
 
   const handleSearch = (e) => {
-
     e.preventDefault();
-
     if (!search.trim()) return;
-
     navigate(`/dashboard?search=${search}`);
-
   };
 
   return (
@@ -52,8 +41,6 @@ export default function Navbar() {
     <nav className="bg-white border-b sticky top-0 z-50">
 
       <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
-
-        {/* LOGO */}
 
         <Link
           to={isLoggedIn ? "/dashboard" : "/login"}
@@ -64,18 +51,12 @@ export default function Navbar() {
           <span className="text-green-600">it</span>
         </Link>
 
-
-        {/* SEARCH BAR (ONLY WHEN LOGGED IN) */}
-
         {isLoggedIn && (
-
           <form
             onSubmit={handleSearch}
             className="hidden md:flex items-center bg-gray-100 rounded-lg px-3 py-1.5 w-64"
           >
-
             <Search size={16} className="text-gray-500 mr-2"/>
-
             <input
               type="text"
               placeholder="Search items..."
@@ -83,62 +64,27 @@ export default function Navbar() {
               onChange={(e)=>setSearch(e.target.value)}
               className="bg-transparent outline-none text-sm w-full"
             />
-
           </form>
-
         )}
-
-
-        {/* DESKTOP NAV */}
 
         <div className="hidden md:flex items-center gap-3">
 
           {!isLoggedIn && (
             <>
-              <DesktopLink to="/login" active={pathname === "/login"}>
-                Login
-              </DesktopLink>
-
-              <DesktopLink to="/register" active={pathname === "/register"}>
-                Register
-              </DesktopLink>
+              <DesktopLink to="/login" active={pathname === "/login"}>Login</DesktopLink>
+              <DesktopLink to="/register" active={pathname === "/register"}>Register</DesktopLink>
             </>
           )}
 
           {isLoggedIn && (
             <>
-              <IconNav
-                to="/dashboard"
-                active={pathname === "/dashboard"}
-                icon={<Home size={20}/>}
-              />
-
-              <IconNav
-                to="/my-posts"
-                active={pathname === "/my-posts"}
-                icon={<FileText size={20}/>}
-              />
-
-              <IconNav
-                to="/returned"
-                active={pathname === "/returned"}
-                icon={<CheckCircle size={20}/>}
-              />
-
-              <IconNav
-                to="/about"
-                active={pathname === "/about"}
-                icon={<Info size={20}/>}
-              />
+              <IconNav to="/dashboard" active={pathname === "/dashboard"} icon={<Home size={20}/>}/>
+              <IconNav to="/my-posts" active={pathname === "/my-posts"} icon={<FileText size={20}/>}/>
+              <IconNav to="/returned" active={pathname === "/returned"} icon={<CheckCircle size={20}/>}/>
+              <IconNav to="/about" active={pathname === "/about"} icon={<Info size={20}/>}/>
 
               {isAdmin && (
-
-                <IconNav
-                  to="/admin"
-                  active={pathname === "/admin"}
-                  icon={<Shield size={20}/>}
-                />
-
+                <IconNav to="/admin" active={pathname === "/admin"} icon={<Shield size={20}/>}/>
               )}
 
               <span className="font-semibold text-gray-700 ml-2">
@@ -146,15 +92,13 @@ export default function Navbar() {
               </span>
 
               {isAdmin && (
-
                 <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-bold">
                   ADMIN
                 </span>
-
               )}
 
               <button
-                onClick={logout}
+                onClick={handleLogout}
                 className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-sm transition"
               >
                 Logout
@@ -164,23 +108,13 @@ export default function Navbar() {
 
         </div>
 
-
-        {/* MOBILE BUTTON */}
-
-        <button
-          onClick={()=>setOpen(!open)}
-          className="md:hidden"
-        >
+        <button onClick={()=>setOpen(!open)} className="md:hidden">
           {open ? <X size={26}/> : <Menu size={26}/>}
         </button>
 
       </div>
 
-
-      {/* MOBILE MENU */}
-
       {open && (
-
         <div className="md:hidden border-t">
 
           {!isLoggedIn && (
@@ -202,7 +136,7 @@ export default function Navbar() {
               )}
 
               <button
-                onClick={logout}
+                onClick={handleLogout}
                 className="block w-full text-left px-6 py-3 text-red-600 hover:bg-red-50"
               >
                 Logout
@@ -211,22 +145,14 @@ export default function Navbar() {
           )}
 
         </div>
-
       )}
 
     </nav>
-
   );
-
 }
 
-
-/* ICON NAV */
-
 function IconNav({ to, icon, active }) {
-
   return (
-
     <Link
       to={to}
       className={`p-2 rounded-lg transition
@@ -234,22 +160,13 @@ function IconNav({ to, icon, active }) {
         ? "bg-blue-100 text-blue-600"
         : "text-gray-600 hover:bg-gray-100 hover:text-blue-600"}`}
     >
-
       {icon}
-
     </Link>
-
   );
-
 }
 
-
-/* DESKTOP TEXT LINK */
-
 function DesktopLink({ to, children, active }) {
-
   return (
-
     <Link
       to={to}
       className={`px-3 py-2 font-medium transition
@@ -259,28 +176,17 @@ function DesktopLink({ to, children, active }) {
     >
       {children}
     </Link>
-
   );
-
 }
 
-
-/* MOBILE LINK */
-
 function MobileItem({ to, children, setOpen }) {
-
   return (
-
     <Link
       to={to}
       onClick={()=>setOpen(false)}
       className="block px-6 py-3 text-gray-700 hover:bg-gray-100"
     >
-
       {children}
-
     </Link>
-
   );
-
 }

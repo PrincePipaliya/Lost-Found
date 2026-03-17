@@ -2,28 +2,21 @@ import { Outlet } from "react-router-dom";
 import { useState } from "react";
 import Navbar from "./components/Navbar";
 import PostItem from "./components/PostItem";
+import { useAuth } from "./context/AuthContext";
 
 export default function Layout() {
 
-  const isLoggedIn = Boolean(localStorage.getItem("accessToken"));
-
+  const { isLoggedIn } = useAuth();
   const [open, setOpen] = useState(false);
 
-  const closeModal = () => {
-    setOpen(false);
-  };
+  const closeModal = () => setOpen(false);
 
   return (
     <>
-
       <Navbar />
-
       <Outlet />
 
-      {/* FLOATING POST BUTTON */}
-
       {isLoggedIn && (
-
         <button
           onClick={() => setOpen(true)}
           className="fixed bottom-6 right-6 z-50 bg-blue-600 hover:bg-blue-700
@@ -32,18 +25,11 @@ export default function Layout() {
         >
           + Post Item
         </button>
-
       )}
 
-      {/* MODAL BACKDROP */}
-
       {open && (
-
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-xl relative p-6 animate-fadeInUp">
-
-            {/* CLOSE BUTTON */}
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-xl relative p-6">
 
             <button
               onClick={closeModal}
@@ -56,19 +42,10 @@ export default function Layout() {
               Post Lost / Found Item
             </h2>
 
-            <PostItem
-              onPosted={() => {
-                closeModal();
-              }}
-            />
-
+            <PostItem onPosted={closeModal} />
           </div>
-
         </div>
-
       )}
-
     </>
   );
-
 }

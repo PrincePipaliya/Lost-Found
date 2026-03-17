@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -11,128 +12,54 @@ import ReturnedItems from "./pages/ReturnedItems";
 
 import Layout from "./Layout";
 
-/* AUTH HELPERS */
-
-const getUser = () => {
-  try {
-    const user = localStorage.getItem("user");
-    if (!user) return null;
-    return JSON.parse(user);
-  } catch {
-    return null;
-  }
-};
-
-const isAuthenticated = () => {
-  return Boolean(localStorage.getItem("accessToken"));
-};
-
-/* ROUTE GUARDS */
+/* ROUTE GUARDS USING CONTEXT */
 
 function PrivateRoute({ children }) {
-  if (!isAuthenticated()) {
-    return <Navigate to="/login" replace />;
-  }
-  return children;
+  const { isLoggedIn } = useAuth();
+  return isLoggedIn ? children : <Navigate to="/login" replace />;
 }
 
 function AdminRoute({ children }) {
-  const user = getUser();
+  const { isLoggedIn, user } = useAuth();
 
-  if (!isAuthenticated()) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (!user || user.role !== "admin") {
-    return <Navigate to="/dashboard" replace />;
-  }
+  if (!isLoggedIn) return <Navigate to="/login" replace />;
+  if (user?.role !== "admin") return <Navigate to="/dashboard" replace />;
 
   return children;
 }
 
+/* ✅ FIXED: PublicRoute NO LONGER REDIRECTS */
 function PublicRoute({ children }) {
-  if (isAuthenticated()) {
-    return <Navigate to="/dashboard" replace />;
-  }
   return children;
 }
 
 /* APP */
 
 export default function App() {
-
   return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<Layout />}>
 
-    <BrowserRouter>
+            {/* ALWAYS ALLOW LOGIN PAGE */}
+            <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+            <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
 
-      <Routes>
+            <Route path="/about" element={<About />} />
+            <Route path="/returned" element={<ReturnedItems />} />
+            <Route path="/items/:id" element={<ItemDetail />} />
 
-        <Route element={<Layout />}>
+            <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+            <Route path="/my-posts" element={<PrivateRoute><MyPosts /></PrivateRoute>} />
+            <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
 
-          <Route
-            path="/login"
-            element={
-              <PublicRoute>
-                <Login />
-              </PublicRoute>
-            }
-          />
+            {/* ✅ DEFAULT: ALWAYS GO TO LOGIN */}
+            <Route path="/" element={<Navigate to="/login" replace />} />
 
-          <Route
-            path="/register"
-            element={
-              <PublicRoute>
-                <Register />
-              </PublicRoute>
-            }
-          />
-
-          <Route path="/about" element={<About />} />
-
-          <Route path="/returned" element={<ReturnedItems />} />
-
-          <Route path="/items/:id" element={<ItemDetail />} />
-
-          <Route
-            path="/dashboard"
-            element={
-              <PrivateRoute>
-                <Dashboard />
-              </PrivateRoute>
-            }
-          />
-
-          <Route
-            path="/my-posts"
-            element={
-              <PrivateRoute>
-                <MyPosts />
-              </PrivateRoute>
-            }
-          />
-
-          <Route
-            path="/admin"
-            element={
-              <AdminRoute>
-                <Admin />
-              </AdminRoute>
-            }
-          />
-
-          {/* DEFAULT ROUTE ALWAYS GOES TO LOGIN */}
-
-          <Route
-            path="/"
-            element={<Navigate to="/login" replace />}
-          />
-
-        </Route>
-
-      </Routes>
-
-    </BrowserRouter>
-
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
-
 }
